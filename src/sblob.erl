@@ -1,6 +1,6 @@
 -module(sblob).
 
--export([open/3, close/1, delete/1, put/2, put/3]).
+-export([open/3, close/1, delete/1, put/2, put/3, get/2]).
 -include("sblob.hrl").
 
 open(Path, Name, Opts) ->
@@ -34,12 +34,16 @@ put(#sblob{seqnum=SeqNum}=Sblob, Timestamp, Data) ->
     ok = file:write(Handle, Blob),
     NewSeqNum = SeqNum + 1,
     {NewSblob#sblob{seqnum=NewSeqNum},
-     #sblob_entry{timestamp=Timestamp, seqnum=NewSeqNum, data=Data}}.
+     #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=size(Data), data=Data}}.
 
 get(#sblob{}=Sblob, SeqNum) ->
     {Handle, NewSblob} = sblob_util:get_handle(Sblob),
-    {ok, Header} = file:read(Handle, ?HEADER_SIZE),
-     #sblob_header{timestamp=Ts, seqnum=Sn, len=Len} = sblob_util:header_from_binary(Header),
+    Offset = sblob_util:offset_for_seqnum(Sblob, SeqNum),
+    file:position(Handle, Offset),
+    {ok, Header} = file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES),
+    HeaderEntry = sblob_util:from_binary(Header),
+    % TODO: don't pattern match?
+    #sblob_entry{len=Len} = HeaderEntry,
     {ok, Data} = file:read(Handle, Len),
-    Entry = sblob_util:from_binary(Bin),
-    {NewSblob#sblob{seqnum=NewSeqNum}, Entry}.
+    Entry = HeaderEntry#sblob_entry{data=Data},
+    {NewSblob, Entry}.

@@ -25,18 +25,20 @@ write_one(#sblob{seqnum=SeqNum}=Sblob) ->
     Data = <<"hello sblob">>,
     {#sblob{seqnum=NewSeqNum}, #sblob_entry{seqnum=EntrySeqNum}} = sblob:put(Sblob, Data),
     [?_assertEqual(SeqNum + 1, NewSeqNum),
-     ?_assertEqual(EntrySeqNum, NewSeqNum)].
+     ?_assertEqual(EntrySeqNum, NewSeqNum - 1)].
 
 write_one_read_one(Sblob) ->
     Data = <<"hello sblob!">>,
     {#sblob{seqnum=NewSeqNum},
      #sblob_entry{seqnum=WSn, timestamp=WTs, data=WData}} = sblob:put(Sblob, Data),
 
-    #sblob_entry{timestamp=RTs, seqnum=RSn, data=RData} = sblob:get(Sblob, WSn),
+    {_NewSblob,
+     #sblob_entry{timestamp=RTs, seqnum=RSn, len=RLen, data=RData}} = sblob:get(Sblob, WSn),
 
     [?_assertEqual(RTs, WTs),
      ?_assertEqual(RSn, WSn),
-     ?_assertEqual(RSn, NewSeqNum),
+     ?_assertEqual(RSn, NewSeqNum - 1),
+     ?_assertEqual(RLen, size(Data)),
      ?_assertEqual(RData, WData)].
 
 open_test() ->

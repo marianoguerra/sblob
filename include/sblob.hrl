@@ -13,4 +13,7 @@
 -record(sblob_entry, {
           timestamp,
           seqnum,
+          len,
           data}).
+
+-define(SBLOB_HEADER_SIZE_BYTES, 20).
