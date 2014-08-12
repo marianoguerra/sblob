@@ -1,0 +1,12 @@
+%% -*- tab-width: 4;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ts=4 sw=4 et
+{application, sblob,
+ [
+  {description, "Persist Stream of Blobs to Disk"},
+  {vsn, "0.0.1"},
+  {modules, []},
+  {applications, [kernel, stdlib]},
+  {registered, []},
+  {mod, {blob, []}},
+  {env, []}
+ ]}.
