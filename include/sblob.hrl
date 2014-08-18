@@ -7,6 +7,7 @@
           name,
           fullpath,
           handle=nil,
+          position=nil,
           seqnum=0,
           config=#sblob_cfg{}}).
 
@@ -17,3 +18,5 @@
           data}).
 
 -define(SBLOB_HEADER_SIZE_BYTES, 20).
+-define(SBLOB_HEADER_LEN_SIZE_BITS, 32).
+-define(SBLOB_HEADER_LEN_SIZE_BYTES, 4).
