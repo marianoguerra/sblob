@@ -1,7 +1,7 @@
 -module(sblob_util).
 -export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
-         clear_data/1,
+         clear_data/1, read/2, remove_folder/1,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2]).
 
@@ -43,6 +43,13 @@ seek_to_seqnum(Sblob, SeqNum) ->
     {ok, NewPos} = file:position(Handle, Offset),
     NewSblob#sblob{position=NewPos}.
 
+read(#sblob{handle=nil}=Sblob, Len) ->
+    {_, NewSblob} = get_handle(Sblob),
+    read(NewSblob, Len);
+
+read(#sblob{position=Pos, handle=Handle}=Sblob, Len) ->
+    {Sblob#sblob{position=Pos + Len}, file:read(Handle, Len)}.
+
 to_binary(#sblob_entry{timestamp=Timestamp, seqnum=SeqNum, data=Data}) ->
     to_binary(Timestamp, SeqNum, Data).
 
@@ -66,6 +73,11 @@ blob_size(EntryDataLen) ->
     HeaderSize = ?SBLOB_HEADER_SIZE_BYTES,
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
     EntryDataLen + LenSize + HeaderSize.
+
+remove_folder(Path) ->
+    % TODO: delete instead of move
+    NowStr = integer_to_list(sblob_util:now()),
+    file:rename(Path, Path ++ "." ++ NowStr ++ ".removed").
 
 % TODO
 offset_for_seqnum(_SBlob, _SeqNum) -> bof.

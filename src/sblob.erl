@@ -23,9 +23,7 @@ close(#sblob{handle=Handle}=Sblob) ->
 
 delete(#sblob{fullpath=FullPath}=Sblob) ->
     NewSblob = close(Sblob),
-    % TODO: delete instead of move
-    NowStr = integer_to_list(sblob_util:now()),
-    ok = file:rename(FullPath, FullPath ++ "." ++ NowStr ++ ".removed"),
+    ok = sblob_util:remove_folder(FullPath),
     NewSblob.
 
 put(Sblob, Data) ->
@@ -40,19 +38,12 @@ put(#sblob{seqnum=SeqNum}=Sblob, Timestamp, Data) ->
     {NewSblob#sblob{seqnum=NewSeqNum},
      #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=size(Data), data=Data}}.
 
-read(#sblob{handle=nil}=Sblob, Len) ->
-    {_, NewSblob} = sblob_util:get_handle(Sblob),
-    read(NewSblob, Len);
-
-read(#sblob{position=Pos, handle=Handle}=Sblob, Len) ->
-    {Sblob#sblob{position=Pos + Len}, file:read(Handle, Len)}.
-
 get_next(Sblob) ->
-    {Sblob1, {ok, Header}} = read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
+    {Sblob1, {ok, Header}} = sblob_util:read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
     HeaderEntry = sblob_util:header_from_binary(Header),
     % TODO: don't pattern match?
     #sblob_entry{len=Len} = HeaderEntry,
-    {Sblob2, {ok, Data}} = read(Sblob1, Len),
+    {Sblob2, {ok, Data}} = sblob_util:read(Sblob1, Len),
     Entry = HeaderEntry#sblob_entry{data=Data},
     {Sblob2, Entry}.
 
@@ -64,7 +55,7 @@ get_last_in_current(Sblob) ->
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
 
     Sblob1 = sblob_util:seek(Sblob, {eof, -LenSize}),
-    {Sblob2, LenData} = read(Sblob1, LenSize),
+    {Sblob2, LenData} = sblob_util:read(Sblob1, LenSize),
     {ok, <<EntryDataLen:?SBLOB_HEADER_LEN_SIZE_BITS/integer>>} = LenData,
 
     Offset = sblob_util:blob_size(EntryDataLen),
