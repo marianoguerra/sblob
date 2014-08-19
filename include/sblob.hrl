@@ -1,6 +1,9 @@
 -record(sblob_cfg, {
-          read_ahead=65536 % see file:open read_ahead opton
-         }).
+          read_ahead=65536, % see file:open read_ahead opton
+          max_items=4096,
+          max_size_bytes=4194304, % 4MB
+          max_age_ms=nil,
+          base_seqnum=0}).
 
 -record(sblob, {
           path,
