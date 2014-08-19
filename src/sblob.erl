@@ -41,8 +41,7 @@ put(#sblob{seqnum=SeqNum}=Sblob, Timestamp, Data) ->
 get_next(Sblob) ->
     {Sblob1, {ok, Header}} = sblob_util:read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
     HeaderEntry = sblob_util:header_from_binary(Header),
-    % TODO: don't pattern match?
-    #sblob_entry{len=Len} = HeaderEntry,
+    Len = HeaderEntry#sblob_entry.len,
     {Sblob2, {ok, Data}} = sblob_util:read(Sblob1, Len),
     Entry = HeaderEntry#sblob_entry{data=Data},
     {Sblob2, Entry}.
