@@ -90,11 +90,14 @@ read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Ac
     {Sblob, CurSeqNum, Accum};
 
 read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
-    {NewSblob, Blob} = get_next(Sblob),
+    {Sblob1, #sblob_entry{seqnum=BlobSeqnum}=Blob} = get_next(Sblob),
     NewAccum = if Accumulate -> [Blob|Accum];
                   true -> Accum
                end,
-    read_until(NewSblob, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum).
+
+    NewIndex = sblob_idx:put(Sblob1#sblob.index, BlobSeqnum, Sblob#sblob.position),
+    Sblob2 = Sblob1#sblob{index=NewIndex},
+    read_until(Sblob2, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum).
 
 get(Sblob, SeqNum) ->
     case get(Sblob, SeqNum, 1) of
