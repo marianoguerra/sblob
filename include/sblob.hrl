@@ -22,11 +22,14 @@
           config=#sblob_cfg{}}).
 
 -record(sblob_entry, {
+          % from here the ones written to disk in order
           timestamp,
           seqnum,
           len,
-          size,
-          data}).
+          data,
+          % until here, len is written once again after data
+          offset,
+          size}).
 
 -define(SBLOB_HEADER_SIZE_BYTES, 20).
 -define(SBLOB_HEADER_LEN_SIZE_BITS, 32).

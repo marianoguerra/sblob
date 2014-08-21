@@ -41,13 +41,14 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
     Blob = sblob_util:to_binary(Timestamp, SeqNum, Data),
     ok = file:write(Handle, Blob),
 
-    NewIndex = sblob_idx:put(Index, SeqNum, Size),
+    EntryOffset = Size,
+    NewIndex = sblob_idx:put(Index, SeqNum, EntryOffset),
     BlobSize = size(Blob),
     NewSize = Size + BlobSize,
 
     NewSeqNum = SeqNum + 1,
     Entry = #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=size(Data),
-                         data=Data, size=BlobSize},
+                         data=Data, size=BlobSize, offset=EntryOffset},
 
     Sblob2 = Sblob1#sblob{seqnum=NewSeqNum, index=NewIndex, size=NewSize},
 
@@ -61,6 +62,6 @@ get(Sblob, SeqNum) ->
 
 get(Sblob, SeqNum, Count) ->
     {OffsetSeqnum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
-    {Sblob2, _LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
-    {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, SeqNum - 1, SeqNum + Count - 1, true),
+    {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
+    {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, LastSeqNum, SeqNum + Count, true),
     {Sblob3, Entries}.

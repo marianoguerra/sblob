@@ -25,16 +25,24 @@ usage_test_() ->
       fun write_4_read_middle_2/1,
       fun write_4_read_last_2/1,
       fun write_4_read_past_end/1,
-      fun write_4_read_out_of_bounds_end/1
+      fun write_4_read_out_of_bounds_end/1,
+
+      fun write_4_close_read_all/1,
+      fun write_4_close_read_first_2/1,
+      fun write_4_close_read_middle_2/1,
+      fun write_4_close_read_last_2/1,
+      fun write_4_close_read_past_end/1,
+      fun write_4_close_read_out_of_bounds_end/1
      ]}.
 
-open_sblob() ->
-    Path = "bucket",
-    Name = "stream",
+reopen(#sblob{path=Path, name=Name}=Sblob) ->
+    sblob:close(Sblob),
     sblob:open(Path, Name, []).
 
 usage_start() ->
-    open_sblob().
+    Path = "bucket",
+    Name = io_lib:format("stream~p", [sblob_util:now()]),
+    sblob:open(Path, Name, []).
 
 usage_stop(Sblob) ->
     sblob:delete(Sblob).
@@ -47,8 +55,7 @@ new_sblob_has_zero_size(Sblob) ->
 open_write_close_open_has_correct_size(Sblob) ->
     Data = <<"hola">>,
     {Sblob1, Entry} = sblob:put(Sblob, Data),
-    sblob:close(Sblob1),
-    NewSblob = open_sblob(),
+    NewSblob = reopen(Sblob1),
     ?_assertEqual(Entry#sblob_entry.size, NewSblob#sblob.size).
 
 write_one(#sblob{seqnum=SeqNum}=Sblob) ->
@@ -109,6 +116,40 @@ write_4_read_past_end(Sblob) ->
 
 write_4_read_out_of_bounds_end(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
+    {_Sblob2, Result} = sblob:get(Sblob1, 5, 20),
+    ?_assertEqual(Result, []).
+
+write_4_close_read_all(Sblob) ->
+    Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
+    {_Sblob2, Result} = sblob:get(Sblob1, 0, 4),
+    [?_assertEqual(length(Result), 4)].
+
+write_4_close_read_first_2(Sblob) ->
+    Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
+    {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 0, 2),
+    [assertEntry(E1, <<"asd 0">>, 0),
+     assertEntry(E2, <<"asd 1">>, 1)].  
+
+write_4_close_read_middle_2(Sblob) ->
+    Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
+    {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 1, 2),
+    [assertEntry(E1, <<"asd 1">>, 1),
+     assertEntry(E2, <<"asd 2">>, 2)].  
+
+write_4_close_read_last_2(Sblob) ->
+    Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
+    {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 2, 2),
+    [assertEntry(E1, <<"asd 2">>, 2),
+     assertEntry(E2, <<"asd 3">>, 3)].  
+
+write_4_close_read_past_end(Sblob) ->
+    Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
+    {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 2, 20),
+    [assertEntry(E1, <<"asd 2">>, 2),
+     assertEntry(E2, <<"asd 3">>, 3)].  
+
+write_4_close_read_out_of_bounds_end(Sblob) ->
+    Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, Result} = sblob:get(Sblob1, 5, 20),
     ?_assertEqual(Result, []).
 

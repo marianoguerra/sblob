@@ -125,11 +125,13 @@ get_next(Sblob) ->
     Len = HeaderEntry#sblob_entry.len,
     {Sblob2, {ok, Tail}} = read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
     Data = binary:part(Tail, 0, Len),
+    EntryOffset = Sblob#sblob.position,
     Entry = HeaderEntry#sblob_entry{data=Data,
-                                    size=?SBLOB_HEADER_LEN_SIZE_BYTES + size(Tail)},
+                                    offset=EntryOffset,
+                                    size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
 
     BlobSeqnum = Entry#sblob_entry.seqnum,
-    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, Sblob#sblob.position),
+    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, EntryOffset),
     Sblob3 = Sblob2#sblob{index=NewIndex},
 
     {Sblob3, Entry}.
@@ -173,6 +175,6 @@ read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
                           true -> Accum
                        end,
 
-            read_until(Sblob1, Blob#sblob_entry.seqnum, TargetSeqNum, Accumulate, NewAccum)
+            read_until(Sblob1, Blob#sblob_entry.seqnum + 1, TargetSeqNum, Accumulate, NewAccum)
     end.
 
