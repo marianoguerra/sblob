@@ -11,6 +11,10 @@ usage_test_() ->
       fun open_write_close_open_has_correct_size/1,
       fun write_one/1,
       fun write_one_read_one/1,
+      fun no_write_read_one/1,
+      fun no_write_read_one_1/1,
+      fun no_write_read_many/1,
+      fun no_write_read_many_1/1,
       fun write_one_read_last/1,
       fun write_two_read_first/1,
       fun write_two_read_last/1,
@@ -45,6 +49,22 @@ write_one(#sblob{seqnum=SeqNum}=Sblob) ->
     {#sblob{seqnum=NewSeqNum}, #sblob_entry{seqnum=EntrySeqNum}} = sblob:put(Sblob, Data),
     [?_assertEqual(SeqNum + 1, NewSeqNum),
      ?_assertEqual(EntrySeqNum, NewSeqNum - 1)].
+
+no_write_read_one(Sblob) ->
+    {_NewSblob, Result} = sblob:get(Sblob, 0),
+    ?_assertEqual(Result, notfound).
+
+no_write_read_one_1(Sblob) ->
+    {_NewSblob, Result} = sblob:get(Sblob, 10),
+    ?_assertEqual(Result, notfound).
+
+no_write_read_many(Sblob) ->
+    {_NewSblob, Result} = sblob:get(Sblob, 0, 10),
+    ?_assertEqual(Result, []).
+
+no_write_read_many_1(Sblob) ->
+    {_NewSblob, Result} = sblob:get(Sblob, 10, 8),
+    ?_assertEqual(Result, []).
 
 write_one_read_one(Sblob) ->
     Data = <<"hello sblob!">>,
