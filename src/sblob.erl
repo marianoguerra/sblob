@@ -85,10 +85,10 @@ read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
 
 read_until(Sblob, CurSeqNum, TargetSeqNum, _Accumulate, Accum)
   when CurSeqNum =:= TargetSeqNum ->
-    {Sblob, CurSeqNum, Accum};
+    {Sblob, CurSeqNum, lists:reverse(Accum)};
 
 read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Accumulate, Accum) ->
-    {Sblob, CurSeqNum, Accum};
+    {Sblob, CurSeqNum, lists:reverse(Accum)};
 
 read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
     {Sblob1, #sblob_entry{seqnum=BlobSeqnum}=Blob} = get_next(Sblob),
