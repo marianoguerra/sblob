@@ -11,8 +11,13 @@
           fullpath,
           handle=nil,
           position=nil,
-          size=0,
-          seqnum=0,
+          size=nil,
+          seqnum=nil,
+          % base_seqnum here is the observed base_seqnum of the first entry
+          % the one in config is the one to use in case we are opening a
+          % sblob that has no items, that means, if not empty this one will
+          % take presedence over the configuration one
+          base_seqnum=nil,
           index=nil,
           config=#sblob_cfg{}}).
 

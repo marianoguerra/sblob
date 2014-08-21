@@ -4,8 +4,10 @@
          clear_data/1, read/2, remove_folder/1,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
-         blob_size/1, offset_for_seqnum/2, fill_size/1]).
+         blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
+% TODO: remove
+-include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
 
 -define(SBLOB_CURRENT_CHUNK_NAME, "current").
@@ -42,7 +44,8 @@ get_handle(#sblob{fullpath=FullPath,
     Path = filename:join([FullPath, ?SBLOB_CURRENT_CHUNK_NAME]),
     {ok, Handle} = file:open(Path, [append, read, raw, binary,
                                     {read_ahead, ReadAhead}]),
-    {Handle, Sblob#sblob{handle=Handle, position=0}}.
+    {ok, Size} = file:position(Handle, eof),
+    {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}}.
 
 % like get_handle but will seek the handle to the required place,
 % Location is the same as file:position
@@ -62,10 +65,17 @@ seek_to_seqnum(Sblob, SeqNum) ->
     {ok, NewPos} = file:position(Handle, {bof, Offset}),
     {OffsetKey, NewSblob#sblob{position=NewPos}}.
 
-fill_size(Sblob) ->
-    NewSblob = seek(Sblob, eof),
-    Pos = NewSblob#sblob.position,
-    NewSblob#sblob{size=Pos}.
+fill_bounds(Sblob) ->
+    {Sblob1, Last} = get_first(Sblob),
+    Cfg = Sblob1#sblob.config,
+    CfgBaseSeqNum = Cfg#sblob_cfg.base_seqnum,
+    case Last of
+        notfound -> 
+            Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum, size=0};
+        #sblob_entry{seqnum=FirstSeqNum} ->
+            {Sblob2, #sblob_entry{seqnum=LastSeqNum}} = get_last(Sblob1),
+            Sblob2#sblob{base_seqnum=FirstSeqNum, seqnum=LastSeqNum}
+    end.
 
 read(#sblob{handle=nil}=Sblob, Len) ->
     {_, NewSblob} = get_handle(Sblob),
@@ -84,7 +94,8 @@ to_binary(Timestamp, SeqNum, Data) ->
 
 from_binary(<<Timestamp:64/integer, SeqNum:64/integer, Len:32/integer, Tail/binary>>) ->
     Data = binary:part(Tail, 0, Len),
-    #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=Len, data=Data}.
+    #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=Len, data=Data,
+                 size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)}.
 
 header_from_binary(<<Timestamp:64/integer, SeqNum:64/integer, Len:32/integer, _Tail/binary>>) ->
     #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=Len, data=nil}.
@@ -114,7 +125,8 @@ get_next(Sblob) ->
     Len = HeaderEntry#sblob_entry.len,
     {Sblob2, {ok, Tail}} = read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
     Data = binary:part(Tail, 0, Len),
-    Entry = HeaderEntry#sblob_entry{data=Data},
+    Entry = HeaderEntry#sblob_entry{data=Data,
+                                    size=?SBLOB_HEADER_LEN_SIZE_BYTES + size(Tail)},
 
     BlobSeqnum = Entry#sblob_entry.seqnum,
     NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, Sblob#sblob.position),
@@ -131,18 +143,23 @@ get_last(Sblob) ->
 
     Sblob1 = seek(Sblob, {eof, -LenSize}),
     {Sblob2, LenData} = read(Sblob1, LenSize),
+    % since we read the last 4 bytes for the entry len we are at the end,
+    % that means that now position == size, we use it to set the blob size
+    SblobSize = Sblob2#sblob.position,
     {ok, <<EntryDataLen:?SBLOB_HEADER_LEN_SIZE_BITS/integer>>} = LenData,
 
     Offset = blob_size(EntryDataLen),
 
-    Sblob3 = seek(Sblob2, {cur, -Offset}),
+    Sblob3 = seek(Sblob2#sblob{size=SblobSize}, {cur, -Offset}),
     get_next(Sblob3).
+
 
 read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
     read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, []).
 
+
 read_until(Sblob, CurSeqNum, TargetSeqNum, _Accumulate, Accum)
-  when CurSeqNum =:= TargetSeqNum ->
+  when CurSeqNum >= TargetSeqNum ->
     {Sblob, CurSeqNum, lists:reverse(Accum)};
 
 read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Accumulate, Accum) ->
@@ -156,6 +173,6 @@ read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
                           true -> Accum
                        end,
 
-            read_until(Sblob1, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum)
+            read_until(Sblob1, Blob#sblob_entry.seqnum, TargetSeqNum, Accumulate, NewAccum)
     end.
 

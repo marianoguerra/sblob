@@ -2,6 +2,7 @@
 
 -export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3]).
 
+% TODO: remove
 -include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
 
@@ -18,8 +19,7 @@ open(Path, Name, Opts) ->
     Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config,
            index=Index},
 
-    sblob_util:fill_size(Sblob).
-
+    sblob_util:fill_bounds(Sblob).
 
 close(#sblob{handle=nil}=Sblob) ->
     Sblob;
@@ -60,16 +60,7 @@ get(Sblob, SeqNum) ->
     end.
 
 get(Sblob, SeqNum, Count) ->
-    % seek to closest blob before (or at) SeqNum
     {OffsetSeqnum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
-    % advance until the start SeqNum if not there
-    Sblob2 = case OffsetSeqnum of
-                 nil -> Sblob1;
-                 Offset when Offset < SeqNum ->
-                     {TSblob2, _LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
-                     TSblob2;
-                 _ -> Sblob1
-             end,
-
-    {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, SeqNum, SeqNum + Count, true),
+    {Sblob2, _LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
+    {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, SeqNum - 1, SeqNum + Count - 1, true),
     {Sblob3, Entries}.

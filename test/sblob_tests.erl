@@ -49,7 +49,7 @@ open_write_close_open_has_correct_size(Sblob) ->
     {Sblob1, Entry} = sblob:put(Sblob, Data),
     sblob:close(Sblob1),
     NewSblob = open_sblob(),
-    ?_assertEqual(NewSblob#sblob.size, Entry#sblob_entry.size).
+    ?_assertEqual(Entry#sblob_entry.size, NewSblob#sblob.size).
 
 write_one(#sblob{seqnum=SeqNum}=Sblob) ->
     Data = <<"hello sblob">>,
