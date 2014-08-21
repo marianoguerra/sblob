@@ -2,6 +2,7 @@
 -export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove_folder/1,
+         get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_size/1]).
 
@@ -104,3 +105,57 @@ remove_folder(Path) ->
 
 offset_for_seqnum(#sblob{index=Idx}, SeqNum) -> 
     sblob_idx:closest(Idx, SeqNum).
+
+get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {Sblob, notfound};
+
+get_next(Sblob) ->
+    {Sblob1, {ok, Header}} = read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
+    HeaderEntry = header_from_binary(Header),
+    Len = HeaderEntry#sblob_entry.len,
+    {Sblob2, {ok, Tail}} = read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
+    Data = binary:part(Tail, 0, Len),
+    Entry = HeaderEntry#sblob_entry{data=Data},
+
+    BlobSeqnum = Entry#sblob_entry.seqnum,
+    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, Sblob#sblob.position),
+    Sblob3 = Sblob2#sblob{index=NewIndex},
+
+    {Sblob3, Entry}.
+
+get_first(Sblob) ->
+    NewSblob = seek(Sblob, bof),
+    get_next(NewSblob).
+
+get_last(Sblob) ->
+    LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
+
+    Sblob1 = seek(Sblob, {eof, -LenSize}),
+    {Sblob2, LenData} = read(Sblob1, LenSize),
+    {ok, <<EntryDataLen:?SBLOB_HEADER_LEN_SIZE_BITS/integer>>} = LenData,
+
+    Offset = blob_size(EntryDataLen),
+
+    Sblob3 = seek(Sblob2, {cur, -Offset}),
+    get_next(Sblob3).
+
+read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
+    read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, []).
+
+read_until(Sblob, CurSeqNum, TargetSeqNum, _Accumulate, Accum)
+  when CurSeqNum =:= TargetSeqNum ->
+    {Sblob, CurSeqNum, lists:reverse(Accum)};
+
+read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Accumulate, Accum) ->
+    {Sblob, CurSeqNum, lists:reverse(Accum)};
+
+read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
+    case get_next(Sblob) of
+        {TSblob1, notfound} -> {TSblob1, CurSeqNum, lists:reverse(Accum)};
+        {Sblob1, Blob} ->
+            NewAccum = if Accumulate -> [Blob|Accum];
+                          true -> Accum
+                       end,
+
+            read_until(Sblob1, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum)
+    end.
+

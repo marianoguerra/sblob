@@ -53,59 +53,6 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
 
     {Sblob2, Entry}.
 
-get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {Sblob, notfound};
-
-get_next(Sblob) ->
-    {Sblob1, {ok, Header}} = sblob_util:read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
-    HeaderEntry = sblob_util:header_from_binary(Header),
-    Len = HeaderEntry#sblob_entry.len,
-    {Sblob2, {ok, Tail}} = sblob_util:read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
-    Data = binary:part(Tail, 0, Len),
-    Entry = HeaderEntry#sblob_entry{data=Data},
-
-    BlobSeqnum = Entry#sblob_entry.seqnum,
-    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, Sblob#sblob.position),
-    Sblob3 = Sblob2#sblob{index=NewIndex},
-
-    {Sblob3, Entry}.
-
-get_first(Sblob) ->
-    NewSblob = sblob_util:seek(Sblob, bof),
-    get_next(NewSblob).
-
-get_last(Sblob) ->
-    LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
-
-    Sblob1 = sblob_util:seek(Sblob, {eof, -LenSize}),
-    {Sblob2, LenData} = sblob_util:read(Sblob1, LenSize),
-    {ok, <<EntryDataLen:?SBLOB_HEADER_LEN_SIZE_BITS/integer>>} = LenData,
-
-    Offset = sblob_util:blob_size(EntryDataLen),
-
-    Sblob3 = sblob_util:seek(Sblob2, {cur, -Offset}),
-    get_next(Sblob3).
-
-read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
-    read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, []).
-
-read_until(Sblob, CurSeqNum, TargetSeqNum, _Accumulate, Accum)
-  when CurSeqNum =:= TargetSeqNum ->
-    {Sblob, CurSeqNum, lists:reverse(Accum)};
-
-read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Accumulate, Accum) ->
-    {Sblob, CurSeqNum, lists:reverse(Accum)};
-
-read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
-    case get_next(Sblob) of
-        {TSblob1, notfound} -> {TSblob1, CurSeqNum, lists:reverse(Accum)};
-        {Sblob1, Blob} ->
-            NewAccum = if Accumulate -> [Blob|Accum];
-                          true -> Accum
-                       end,
-
-            read_until(Sblob1, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum)
-    end.
-
 get(Sblob, SeqNum) ->
     case get(Sblob, SeqNum, 1) of
         {NewSblob, []} -> {NewSblob, notfound};
@@ -119,10 +66,10 @@ get(Sblob, SeqNum, Count) ->
     Sblob2 = case OffsetSeqnum of
                  nil -> Sblob1;
                  Offset when Offset < SeqNum ->
-                     {TSblob2, _LastSeqNum, _Entries} = read_until(Sblob1, OffsetSeqnum, SeqNum, false),
+                     {TSblob2, _LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
                      TSblob2;
                  _ -> Sblob1
              end,
 
-    {Sblob3, _, Entries} = read_until(Sblob2, SeqNum, SeqNum + Count, true),
+    {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, SeqNum, SeqNum + Count, true),
     {Sblob3, Entries}.
