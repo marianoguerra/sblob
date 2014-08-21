@@ -1,11 +1,14 @@
 -module(sblob_idx).
--export([new/1, put/3, closest/2]).
+-export([new/1, new/2, put/3, closest/2]).
 
 -record(sblob_idx, {base_key=0, data}).
 -define(SBLOB_IDX_DEFAULT_INDEX_SIZE, 256).
 
 new(BaseKey) ->
-    Data = array:new(?SBLOB_IDX_DEFAULT_INDEX_SIZE),
+    new(BaseKey, ?SBLOB_IDX_DEFAULT_INDEX_SIZE).
+
+new(BaseKey, MaxItems) ->
+    Data = array:new(MaxItems),
     #sblob_idx{base_key=BaseKey, data=Data}.
 
 put(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key, Val) ->
@@ -21,7 +24,7 @@ closest_loop(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->
             Val = array:get(I, Data),
             case Val of
                 undefined -> closest_loop(Idx, Key - 1);
-                _ -> Val
+                _ -> {Key, Val}
             end
     end.
 
@@ -32,7 +35,7 @@ closest(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->
     I = Key - BaseKey,
     Val = array:get(I, Data),
     case Val of
-        undefined -> closest_loop(Idx, Key -1);
-        _ -> Val
+        undefined -> closest_loop(Idx, Key - 1);
+        _ -> {Key, Val}
     end.
 

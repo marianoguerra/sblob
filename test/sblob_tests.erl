@@ -7,6 +7,8 @@ usage_test_() ->
      fun usage_start/0,
      fun usage_stop/1,
      [fun do_nothing/1,
+      fun new_sblob_has_zero_size/1,
+      fun open_write_close_open_has_correct_size/1,
       fun write_one/1,
       fun write_one_read_one/1,
       fun write_one_read_last/1,
@@ -15,15 +17,28 @@ usage_test_() ->
       fun write_two_read_first_and_last/1
      ]}.
 
-usage_start() ->
+open_sblob() ->
     Path = "bucket",
     Name = "stream",
     sblob:open(Path, Name, []).
+
+usage_start() ->
+    open_sblob().
 
 usage_stop(Sblob) ->
     sblob:delete(Sblob).
 
 do_nothing(_Sblob) -> [].
+
+new_sblob_has_zero_size(Sblob) ->
+    ?_assertEqual(Sblob#sblob.size, 0).
+
+open_write_close_open_has_correct_size(Sblob) ->
+    Data = <<"hola">>,
+    {Sblob1, Entry} = sblob:put(Sblob, Data),
+    sblob:close(Sblob1),
+    NewSblob = open_sblob(),
+    ?_assertEqual(NewSblob#sblob.size, Entry#sblob_entry.size).
 
 write_one(#sblob{seqnum=SeqNum}=Sblob) ->
     Data = <<"hello sblob">>,
@@ -33,11 +48,11 @@ write_one(#sblob{seqnum=SeqNum}=Sblob) ->
 
 write_one_read_one(Sblob) ->
     Data = <<"hello sblob!">>,
-    {#sblob{seqnum=NewSeqNum},
+    {#sblob{seqnum=NewSeqNum}=Sblob1,
      #sblob_entry{seqnum=WSn, timestamp=WTs, data=WData}} = sblob:put(Sblob, Data),
 
     {_NewSblob,
-     #sblob_entry{timestamp=RTs, seqnum=RSn, len=RLen, data=RData}} = sblob:get(Sblob, WSn),
+     #sblob_entry{timestamp=RTs, seqnum=RSn, len=RLen, data=RData}} = sblob:get(Sblob1, WSn),
 
     [?_assertEqual(RTs, WTs),
      ?_assertEqual(RSn, WSn),

@@ -11,13 +11,16 @@
           fullpath,
           handle=nil,
           position=nil,
+          size=0,
           seqnum=0,
+          index=nil,
           config=#sblob_cfg{}}).
 
 -record(sblob_entry, {
           timestamp,
           seqnum,
           len,
+          size,
           data}).
 
 -define(SBLOB_HEADER_SIZE_BYTES, 20).

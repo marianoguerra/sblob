@@ -3,7 +3,7 @@
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove_folder/1,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
-         blob_size/1, offset_for_seqnum/2]).
+         blob_size/1, offset_for_seqnum/2, fill_size/1]).
 
 -include("sblob.hrl").
 
@@ -54,9 +54,17 @@ seek(#sblob{handle=Handle}=Sblob, Location) ->
 
 seek_to_seqnum(Sblob, SeqNum) ->
     {Handle, NewSblob} = get_handle(Sblob),
-    Offset = offset_for_seqnum(Sblob, SeqNum),
-    {ok, NewPos} = file:position(Handle, Offset),
-    NewSblob#sblob{position=NewPos}.
+    {OffsetKey, Offset} =  case offset_for_seqnum(Sblob, SeqNum) of
+        notfound -> {nil, 0};
+        Result -> Result
+    end,
+    {ok, NewPos} = file:position(Handle, {bof, Offset}),
+    {OffsetKey, NewSblob#sblob{position=NewPos}}.
+
+fill_size(Sblob) ->
+    NewSblob = seek(Sblob, eof),
+    Pos = NewSblob#sblob.position,
+    NewSblob#sblob{size=Pos}.
 
 read(#sblob{handle=nil}=Sblob, Len) ->
     {_, NewSblob} = get_handle(Sblob),
@@ -94,5 +102,5 @@ remove_folder(Path) ->
     NowStr = integer_to_list(sblob_util:now()),
     file:rename(Path, Path ++ "." ++ NowStr ++ ".removed").
 
-% TODO
-offset_for_seqnum(_SBlob, _SeqNum) -> bof.
+offset_for_seqnum(#sblob{index=Idx}, SeqNum) -> 
+    sblob_idx:closest(Idx, SeqNum).

@@ -15,13 +15,15 @@ get_notfound_test() ->
 put_get_test() ->
     Idx = sblob_idx:new(22),
     Idx1 = sblob_idx:put(Idx, 22, a),
-    Val = sblob_idx:closest(Idx1, 22),
+    {Key, Val} = sblob_idx:closest(Idx1, 22),
+    ?assertEqual(Key, 22),
     ?assertEqual(Val, a).
 
 put_closest_test() ->
     Idx = sblob_idx:new(22),
     Idx1 = sblob_idx:put(Idx, 22, a),
-    Val = sblob_idx:closest(Idx1, 25),
+    {Key, Val} = sblob_idx:closest(Idx1, 25),
+    ?assertEqual(Key, 22),
     ?assertEqual(Val, a).
 
 put_get_notfound_test() ->
@@ -44,5 +46,6 @@ put_two_closest_test() ->
     Idx = sblob_idx:new(22),
     Idx1 = sblob_idx:put(Idx, 22, a),
     Idx2 = sblob_idx:put(Idx1, 24, b),
-    Val = sblob_idx:closest(Idx2, 25),
+    {Key, Val} = sblob_idx:closest(Idx2, 25),
+    ?assertEqual(Key, 24),
     ?assertEqual(Val, b).
