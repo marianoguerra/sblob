@@ -59,7 +59,8 @@ get_next(Sblob) ->
     {Sblob1, {ok, Header}} = sblob_util:read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
     HeaderEntry = sblob_util:header_from_binary(Header),
     Len = HeaderEntry#sblob_entry.len,
-    {Sblob2, {ok, Data}} = sblob_util:read(Sblob1, Len),
+    {Sblob2, {ok, Tail}} = sblob_util:read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
+    Data = binary:part(Tail, 0, Len),
     Entry = HeaderEntry#sblob_entry{data=Data},
     {Sblob2, Entry}.
 

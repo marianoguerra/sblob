@@ -18,7 +18,9 @@ usage_test_() ->
       fun write_one_read_last/1,
       fun write_two_read_first/1,
       fun write_two_read_last/1,
-      fun write_two_read_first_and_last/1
+      fun write_two_read_first_and_last/1,
+
+      fun write_4_read_all/1
      ]}.
 
 open_sblob() ->
@@ -66,6 +68,11 @@ no_write_read_many_1(Sblob) ->
     {_NewSblob, Result} = sblob:get(Sblob, 10, 8),
     ?_assertEqual(Result, []).
 
+write_4_read_all(Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    {_Sblob2, Result} = sblob:get(Sblob1, 0, 4),
+    [?_assertEqual(length(Result), 4)].
+
 write_one_read_one(Sblob) ->
     Data = <<"hello sblob!">>,
     {#sblob{seqnum=NewSeqNum}=Sblob1,
@@ -98,6 +105,18 @@ write(Sblob, Data) ->
     Put = sblob:put(Sblob, Data),
     {NewSblob, Entry} = Put,
     {Data, Put, NewSblob, Entry}.
+
+write_many(Sblob, Base, Count) ->
+    write_many(Sblob, Base, Count, 0).
+
+write_many(Sblob, _Base, 0, _I) ->
+    Sblob;
+
+write_many(Sblob, Base, Count, I) ->
+    DataStr = io_lib:format("~s~p", [Base, I]),
+    Data = list_to_binary(DataStr),
+    {_, _, NewSblob, _} = write(Sblob, Data),
+    write_many(NewSblob, Base, Count - 1, I + 1).
 
 write_first(Sblob) ->
     Data = <<"hello sblob head!">>,
