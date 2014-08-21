@@ -2,8 +2,6 @@
 
 -export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3]).
 
--export([get_first_in_current/1, get_last_in_current/1]).
-
 -include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
 
@@ -55,6 +53,8 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
 
     {Sblob2, Entry}.
 
+get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {Sblob, notfound};
+
 get_next(Sblob) ->
     {Sblob1, {ok, Header}} = sblob_util:read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
     HeaderEntry = sblob_util:header_from_binary(Header),
@@ -62,13 +62,18 @@ get_next(Sblob) ->
     {Sblob2, {ok, Tail}} = sblob_util:read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
     Data = binary:part(Tail, 0, Len),
     Entry = HeaderEntry#sblob_entry{data=Data},
-    {Sblob2, Entry}.
 
-get_first_in_current(Sblob) ->
+    BlobSeqnum = Entry#sblob_entry.seqnum,
+    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, Sblob#sblob.position),
+    Sblob3 = Sblob2#sblob{index=NewIndex},
+
+    {Sblob3, Entry}.
+
+get_first(Sblob) ->
     NewSblob = sblob_util:seek(Sblob, bof),
     get_next(NewSblob).
 
-get_last_in_current(Sblob) ->
+get_last(Sblob) ->
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
 
     Sblob1 = sblob_util:seek(Sblob, {eof, -LenSize}),
@@ -91,14 +96,15 @@ read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Ac
     {Sblob, CurSeqNum, lists:reverse(Accum)};
 
 read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
-    {Sblob1, #sblob_entry{seqnum=BlobSeqnum}=Blob} = get_next(Sblob),
-    NewAccum = if Accumulate -> [Blob|Accum];
-                  true -> Accum
-               end,
+    case get_next(Sblob) of
+        {TSblob1, notfound} -> {TSblob1, CurSeqNum, lists:reverse(Accum)};
+        {Sblob1, Blob} ->
+            NewAccum = if Accumulate -> [Blob|Accum];
+                          true -> Accum
+                       end,
 
-    NewIndex = sblob_idx:put(Sblob1#sblob.index, BlobSeqnum, Sblob#sblob.position),
-    Sblob2 = Sblob1#sblob{index=NewIndex},
-    read_until(Sblob2, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum).
+            read_until(Sblob1, CurSeqNum + 1, TargetSeqNum, Accumulate, NewAccum)
+    end.
 
 get(Sblob, SeqNum) ->
     case get(Sblob, SeqNum, 1) of
@@ -106,31 +112,17 @@ get(Sblob, SeqNum) ->
         {NewSblob, [Entry]} -> {NewSblob, Entry}
     end.
 
-get(#sblob{size=SblobSize}=Sblob, SeqNum, Count) ->
+get(Sblob, SeqNum, Count) ->
     % seek to closest blob before (or at) SeqNum
     {OffsetSeqnum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
-    NewPosition = Sblob1#sblob.position,
-    % advance until the start SeqNum, check if we can read the requested blobs
-    %  * we are not at the end of the file
-    {CanRead, Sblob2} = case OffsetSeqnum of
-                % if no closest entry below SeqNum is found and we are
-                % at the end of the file we can't read the entry
-                nil when NewPosition =:= SblobSize -> {false, Sblob1};
-                nil -> {true, Sblob1};
-                Offset when Offset < SeqNum ->
-                    {TSblob2, LastSeqNum, _Entries} = read_until(Sblob1, OffsetSeqnum, SeqNum, false),
-                    CanReadNext = ((LastSeqNum + 1) =:= SeqNum),
-                    {CanReadNext, TSblob2};
-                _ -> {true, Sblob1}
-            end,
+    % advance until the start SeqNum if not there
+    Sblob2 = case OffsetSeqnum of
+                 nil -> Sblob1;
+                 Offset when Offset < SeqNum ->
+                     {TSblob2, _LastSeqNum, _Entries} = read_until(Sblob1, OffsetSeqnum, SeqNum, false),
+                     TSblob2;
+                 _ -> Sblob1
+             end,
 
-    %?debugFmt("Seqnum ~p, OffsetSeqNum ~p, Position ~p, Size ~p, CanRead ~p~n",
-    %          [SeqNum, OffsetSeqnum, NewPosition, SblobSize, CanRead]),
-    % if can read, read the requested blobs, otherwise return empty list
-    if
-        CanRead ->
-            {Sblob3, _, Entries} = read_until(Sblob2, SeqNum, SeqNum + Count, true),
-            {Sblob3, Entries};
-        true ->
-            {Sblob2, []}
-    end.
+    {Sblob3, _, Entries} = read_until(Sblob2, SeqNum, SeqNum + Count, true),
+    {Sblob3, Entries}.

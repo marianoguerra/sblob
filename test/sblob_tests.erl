@@ -128,11 +128,11 @@ write_one_read_one(Sblob) ->
 
 write_one_read_last(Sblob) ->
     Data = <<"hello sblob!">>,
-    {#sblob{seqnum=NewSeqNum},
+    {#sblob{seqnum=NewSeqNum}=Sblob1,
      #sblob_entry{seqnum=WSn, timestamp=WTs, data=WData}} = sblob:put(Sblob, Data),
 
     {_NewSblob,
-     #sblob_entry{timestamp=RTs, seqnum=RSn, len=RLen, data=RData}} = sblob:get_last_in_current(Sblob),
+     #sblob_entry{timestamp=RTs, seqnum=RSn, len=RLen, data=RData}} = sblob:get(Sblob1, 0),
 
     [?_assertEqual(RTs, WTs),
      ?_assertEqual(RSn, WSn),
@@ -165,9 +165,6 @@ write_second(Sblob) ->
     Data = <<"hello sblob tail!">>,
     write(Sblob, Data).
 
-read_first(Sblob) ->
-    sblob:get_first_in_current(Sblob).
-
 write_two(Sblob) ->
     {HData, _HPut, HSblob, HEntry} = write_first(Sblob),
     {TData, _TPut, TSblob, TEntry} = write_second(HSblob),
@@ -177,7 +174,7 @@ write_two_read_first(Sblob) ->
     {NewSblob, HEntry, HData, _TEntry, _TData} = write_two(Sblob),
 
     #sblob_entry{seqnum=HWSn, timestamp=HWTs, data=HWData} = HEntry,
-    {_NewSblob1, RHEntry} = read_first(NewSblob),
+    {_NewSblob1, RHEntry} = sblob:get(NewSblob, 0),
     #sblob_entry{timestamp=RHTs, seqnum=RHSn, len=RHLen, data=RHData} = RHEntry,
 
     % read head asserts
@@ -191,7 +188,7 @@ write_two_read_last(Sblob) ->
     {NewSblob, _HEntry, _HData, TEntry, TData} = write_two(Sblob),
 
     #sblob_entry{seqnum=TWSn, timestamp=TWTs, data=TWData} = TEntry,
-    {_RTSblob, RTEntry} = sblob:get_last_in_current(NewSblob),
+    {_RTSblob, RTEntry} = sblob:get(NewSblob, 1),
     
     #sblob_entry{timestamp=RTTs, seqnum=RTSn, len=RTLen, data=RTData} = RTEntry,
 
@@ -208,11 +205,11 @@ write_two_read_first_and_last(Sblob) ->
     #sblob_entry{seqnum=HWSn, timestamp=HWTs, data=HWData} = HEntry,
     #sblob_entry{seqnum=TWSn, timestamp=TWTs, data=TWData} = TEntry,
    
-    {NewSblob1, RHEntry} = read_first(NewSblob),
+    {NewSblob1, RHEntry} = sblob:get(NewSblob, 0),
     #sblob_entry{timestamp=RHTs, seqnum=RHSn, len=RHLen, data=RHData} = RHEntry,
             
     % read tail
-    {_RTSblob, RTEntry} = sblob:get_last_in_current(NewSblob1),
+    {_RTSblob, RTEntry} = sblob:get(NewSblob1, 1),
     
     #sblob_entry{timestamp=RTTs, seqnum=RTSn, len=RTLen, data=RTData} = RTEntry,
 
