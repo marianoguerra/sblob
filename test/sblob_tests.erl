@@ -289,7 +289,7 @@ open_test() ->
     AbsPath = filename:absname(Path),
     FullPath = filename:join([AbsPath, Name]),
     Sblob = sblob:open(Path, Name, []),
-    true = filelib:is_dir(FullPath),
+    true = filelib:is_file(FullPath),
     #sblob{path=AbsPath, fullpath=FullPath, name=Name, seqnum=0,
            config=#sblob_cfg{}} = Sblob.
 

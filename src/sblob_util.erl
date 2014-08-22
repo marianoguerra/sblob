@@ -1,16 +1,12 @@
 -module(sblob_util).
 -export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
-         clear_data/1, read/2, remove_folder/1,
+         clear_data/1, read/2, remove/1,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
-% TODO: remove
--include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
-
--define(SBLOB_CURRENT_CHUNK_NAME, "current").
 
 now() ->
     {Mega, Sec, Micro} = erlang:now(),
@@ -41,8 +37,7 @@ parse_config([], Config) ->
 % and store it in the returned Sblob record
 get_handle(#sblob{fullpath=FullPath,
                   config=#sblob_cfg{read_ahead=ReadAhead}}=Sblob) ->
-    Path = filename:join([FullPath, ?SBLOB_CURRENT_CHUNK_NAME]),
-    {ok, Handle} = file:open(Path, [append, read, raw, binary,
+    {ok, Handle} = file:open(FullPath, [append, read, raw, binary,
                                     {read_ahead, ReadAhead}]),
     {ok, Size} = file:position(Handle, eof),
     {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}}.
@@ -109,7 +104,7 @@ blob_size(EntryDataLen) ->
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
     EntryDataLen + LenSize + HeaderSize.
 
-remove_folder(Path) ->
+remove(Path) ->
     % TODO: delete instead of move
     NowStr = integer_to_list(sblob_util:now()),
     file:rename(Path, Path ++ "." ++ NowStr ++ ".removed").

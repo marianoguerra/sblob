@@ -2,8 +2,6 @@
 
 -export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3]).
 
-% TODO: remove
--include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
 
 open(Path, Name, Opts) ->
@@ -14,8 +12,7 @@ open(Path, Name, Opts) ->
     #sblob_cfg{base_seqnum=BaseSeqnum, max_items=MaxItems} = Config,
     Index = sblob_idx:new(BaseSeqnum, MaxItems),
 
-    % join it with something so all the dirs to the last part are created
-    ok = filelib:ensure_dir(filename:join([FullPath, "a"])),
+    ok = filelib:ensure_dir(FullPath),
     Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config,
            index=Index},
 
@@ -29,7 +26,7 @@ close(#sblob{handle=Handle}=Sblob) ->
 
 delete(#sblob{fullpath=FullPath}=Sblob) ->
     NewSblob = close(Sblob),
-    ok = sblob_util:remove_folder(FullPath),
+    ok = sblob_util:remove(FullPath),
     NewSblob.
 
 put(Sblob, Data) ->
