@@ -69,7 +69,7 @@ fill_bounds(Sblob) ->
             Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum, size=0};
         #sblob_entry{seqnum=FirstSeqNum} ->
             {Sblob2, #sblob_entry{seqnum=LastSeqNum}} = get_last(Sblob1),
-            Sblob2#sblob{base_seqnum=FirstSeqNum, seqnum=LastSeqNum}
+            Sblob2#sblob{base_seqnum=FirstSeqNum - 1, seqnum=LastSeqNum}
     end.
 
 read(#sblob{handle=nil}=Sblob, Len) ->

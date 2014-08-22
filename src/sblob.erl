@@ -1,6 +1,6 @@
 -module(sblob).
 
--export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3]).
+-export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3, stats/1]).
 
 -include("sblob.hrl").
 
@@ -62,3 +62,7 @@ get(Sblob, SeqNum, Count) ->
     {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
     {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, LastSeqNum, SeqNum + Count, true),
     {Sblob3, Entries}.
+
+stats(#sblob{base_seqnum=BaseSeqNum, seqnum=SeqNum, size=Size}) ->
+    Count = SeqNum - BaseSeqNum,
+    #sblob_stats{first_sn=BaseSeqNum, last_sn=SeqNum, count=Count, size=Size}.

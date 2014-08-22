@@ -33,6 +33,18 @@
           offset,
           size}).
 
+-record(sblob_stats, {
+          % first written blob seqnum minus one on this file
+          first_sn,
+          % last written blob seqnum on this file, if 0 it means no written
+          % seqnum
+          last_sn,
+          % count of written blobs
+          count,
+          % sblob file size
+          size
+}).
+
 -define(SBLOB_HEADER_SIZE_BYTES, 20).
 -define(SBLOB_HEADER_LEN_SIZE_BITS, 32).
 -define(SBLOB_HEADER_LEN_SIZE_BYTES, 4).

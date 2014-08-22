@@ -11,6 +11,11 @@ usage_test_() ->
       fun open_write_close_open_has_correct_size/1,
       fun write_one/1,
       fun write_one_read_one/1,
+
+      fun no_write_stats/1,
+      fun write_stats/1,
+      fun write_reopen_stats/1,
+
       fun no_write_read_one/1,
       fun no_write_read_one_1/1,
       fun no_write_read_many/1,
@@ -167,6 +172,20 @@ write_4_close_read_out_of_bounds_end(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, Result} = sblob:get(Sblob1, 5, 20),
     ?_assertEqual(Result, []).
+
+no_write_stats(Sblob) ->
+    Stats = sblob:stats(Sblob),
+    ?_assertEqual(Stats, #sblob_stats{first_sn=0, last_sn=0, count=0, size=0}).
+
+write_stats(Sblob) ->
+    {Sblob1, _Entry} = sblob:put(Sblob, <<"lala">>),
+    Stats = sblob:stats(Sblob1),
+    ?_assertEqual(Stats, #sblob_stats{first_sn=0, last_sn=1, count=1, size=28}).
+
+write_reopen_stats(Sblob) ->
+    {Sblob1, _Entry} = sblob:put(Sblob, <<"lala">>),
+    Stats = sblob:stats(reopen(Sblob1)),
+    ?_assertEqual(Stats, #sblob_stats{first_sn=0, last_sn=1, count=1, size=28}).
 
 write_one_read_one(Sblob) ->
     Data = <<"hello sblob!">>,
