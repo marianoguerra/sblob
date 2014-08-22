@@ -44,10 +44,14 @@ sblob_for_chunk_num(#gblob{path=Path}, Num, Opts) ->
     sblob:open(Path, Name, Opts).
 
 get_last_seqnum(#gblob{max_chunk_num=MaxChunkNum}=Gblob) ->
-    LastSblob = sblob_for_chunk_num(Gblob, MaxChunkNum),
-    Stats = sblob:stats(LastSblob),
-    _ = sblob:close(LastSblob),
-    Stats#sblob_stats.last_sn.
+    if
+        MaxChunkNum == 0 -> 0;
+        true ->
+            LastSblob = sblob_for_chunk_num(Gblob, MaxChunkNum),
+            Stats = sblob:stats(LastSblob),
+            _ = sblob:close(LastSblob),
+            Stats#sblob_stats.last_sn
+    end.
 
 get_current(Gblob) ->
     get_current(Gblob, -1).
@@ -59,9 +63,10 @@ get_current(#gblob{current=nil, path=Path}=Gblob, BaseSeqNum) ->
     Sblob1 = if
         SblobSize == 0 andalso BaseSeqNum == -1 ->
             LastSeqNum = get_last_seqnum(Gblob),
-            Sblob#sblob{base_seqnum=LastSeqNum};
+            Sblob#sblob{base_seqnum=LastSeqNum, seqnum=LastSeqNum};
+        BaseSeqNum == -1 -> Sblob;
         true ->
-            Sblob#sblob{base_seqnum=BaseSeqNum}
+            Sblob#sblob{base_seqnum=BaseSeqNum, seqnum=BaseSeqNum}
     end,
 
     {Gblob#gblob{current=Sblob1}, Sblob1};

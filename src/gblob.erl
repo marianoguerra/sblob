@@ -17,8 +17,8 @@ close(#gblob{current=nil}=Gblob) ->
     Gblob;
 
 close(#gblob{current=Sblob}=Gblob) ->
-    Sblob1 = sblob:close(Sblob),
-    Gblob#gblob{current=Sblob1}.
+    _Sblob1 = sblob:close(Sblob),
+    Gblob#gblob{current=nil}.
 
 delete(#gblob{path=Path}=Gblob) ->
     NewGblob = close(Gblob),
