@@ -101,7 +101,7 @@ blob_size(EntryDataLen) ->
 remove(Path) ->
     % TODO: delete instead of move
     NowStr = integer_to_list(sblob_util:now()),
-    file:rename(Path, Path ++ "." ++ NowStr ++ ".removed").
+    ok = file:rename(Path, Path ++ "." ++ NowStr ++ ".removed").
 
 offset_for_seqnum(#sblob{index=Idx}, SeqNum) -> 
     sblob_idx:closest(Idx, SeqNum).
