@@ -16,9 +16,9 @@
           % no inserted blob
           seqnum=nil,
           % base_seqnum here is the observed base_seqnum of the first entry
-          % the one in config is the one to use in case we are opening a
-          % sblob that has no items, that means, if not empty this one will
-          % take presedence over the configuration one
+          % *minus one* the one in config is the one to use in case we are
+          % opening a sblob that has no items, that means, if not empty this
+          % one will take presedence over the configuration one
           base_seqnum=nil,
           index=nil,
           config=#sblob_cfg{}}).
@@ -34,7 +34,7 @@
           size}).
 
 -record(sblob_stats, {
-          % first written blob seqnum minus one on this file
+          % first written blob seqnum *minus one* on this file
           first_sn,
           % last written blob seqnum on this file, if 0 it means no written
           % seqnum
