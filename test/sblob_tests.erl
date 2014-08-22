@@ -15,6 +15,9 @@ usage_test_() ->
       fun no_write_read_one_1/1,
       fun no_write_read_many/1,
       fun no_write_read_many_1/1,
+
+      fun write_close_write_read_all/1,
+
       fun write_one_read_last/1,
       fun write_two_read_first/1,
       fun write_two_read_last/1,
@@ -75,6 +78,18 @@ no_write_read_one_1(Sblob) ->
 no_write_read_many(Sblob) ->
     {_NewSblob, Result} = sblob:get(Sblob, 1, 10),
     ?_assertEqual(Result, []).
+
+write_close_write_read_all(Sblob) ->
+    Data1 = <<"a">>,
+    Data2 = <<"b">>,
+    {Sblob1, Entry1} = sblob:put(Sblob, Data1),
+    Sblob2 = reopen(Sblob1),
+    {Sblob3, Entry2} = sblob:put(Sblob2, Data2),
+    {_Sblob4, [E1, E2]} = sblob:get(Sblob3, 1, 2),
+    [assertEntry(E1, <<"a">>, 1),
+     assertEntry(E2, <<"b">>, 2),
+     ?_assertEqual(E1, Entry1),
+     ?_assertEqual(E2, Entry2)].
 
 no_write_read_many_1(Sblob) ->
     {_NewSblob, Result} = sblob:get(Sblob, 10, 8),
