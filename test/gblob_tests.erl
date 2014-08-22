@@ -1,5 +1,6 @@
 -module(gblob_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("sblob.hrl").
 -include("gblob.hrl").
 
 usage_test_() ->
@@ -39,22 +40,44 @@ write_many(Gblob, Count) ->
                end, Gblob, lists:seq(0, Count)).
 
 write_100(Gblob) ->
-    write_many(Gblob, 100),
-    [].
+    Gblob1 = write_many(Gblob, 98),
+    {_Gblob2, [E1, E2, E3, E4, E5, E6, E7, E8, E9]} = gblob:get(Gblob1, 91, 10),
+    [assert_entry(E1, <<"item 90">>, 91),
+     assert_entry(E2, <<"item 91">>, 92),
+     assert_entry(E3, <<"item 92">>, 93),
+     assert_entry(E4, <<"item 93">>, 94),
+     assert_entry(E5, <<"item 94">>, 95),
+     assert_entry(E6, <<"item 95">>, 96),
+     assert_entry(E7, <<"item 96">>, 97),
+     assert_entry(E8, <<"item 97">>, 98),
+     assert_entry(E9, <<"item 98">>, 99)].
+
+assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
+    [?_assertEqual(Data, EData),
+     ?_assertEqual(SeqNum, ESeqNum),
+     ?_assertEqual(Len, size(Data))].
 
 write_rotate_reopen_write(Gblob) ->
     Gblob1 = write_many(Gblob, 9),
     Gblob2 = reopen(Gblob1),
     Gblob3 = write_many(Gblob2, 5),
-    {_Gblob4, Result} = gblob:get(Gblob3, 11, 5),
-    [?_assertEqual(5, length(Result))].
+    {_Gblob4, [E1, E2, E3, E4, E5]} = gblob:get(Gblob3, 11, 5),
+    [assert_entry(E1, <<"item 0">>, 11),
+     assert_entry(E2, <<"item 1">>, 12),
+     assert_entry(E3, <<"item 2">>, 13),
+     assert_entry(E4, <<"item 3">>, 14),
+     assert_entry(E5, <<"item 4">>, 15)].
 
 write_rotate_write_reopen_write(Gblob) ->
     Gblob1 = write_many(Gblob, 10),
     Gblob2 = reopen(Gblob1),
     Gblob3 = write_many(Gblob2, 5),
-    {_Gblob4, Result} = gblob:get(Gblob3, 11, 5),
-    [?_assertEqual(5, length(Result))].
+    {_Gblob4, [E1, E2, E3, E4, E5]} = gblob:get(Gblob3, 11, 5),
+    [assert_entry(E1, <<"item 10">>, 11),
+     assert_entry(E2, <<"item 0">>, 12),
+     assert_entry(E3, <<"item 1">>, 13),
+     assert_entry(E4, <<"item 2">>, 14),
+     assert_entry(E5, <<"item 3">>, 15)].
 
 open_test() ->
     Path = "gblob",

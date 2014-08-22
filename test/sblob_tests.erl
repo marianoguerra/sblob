@@ -91,8 +91,8 @@ write_close_write_read_all(Sblob) ->
     Sblob2 = reopen(Sblob1),
     {Sblob3, Entry2} = sblob:put(Sblob2, Data2),
     {_Sblob4, [E1, E2]} = sblob:get(Sblob3, 1, 2),
-    [assertEntry(E1, <<"a">>, 1),
-     assertEntry(E2, <<"b">>, 2),
+    [assert_entry(E1, <<"a">>, 1),
+     assert_entry(E2, <<"b">>, 2),
      ?_assertEqual(E1, Entry1),
      ?_assertEqual(E2, Entry2)].
 
@@ -105,7 +105,7 @@ write_4_read_all(Sblob) ->
     {_Sblob2, Result} = sblob:get(Sblob1, 1, 4),
     [?_assertEqual(length(Result), 4)].
 
-assertEntry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
+assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
     [?_assertEqual(Data, EData),
      ?_assertEqual(SeqNum, ESeqNum),
      ?_assertEqual(Len, size(Data))].
@@ -113,26 +113,26 @@ assertEntry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
 write_4_read_first_2(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 1, 2),
-    [assertEntry(E1, <<"asd 0">>, 1),
-     assertEntry(E2, <<"asd 1">>, 2)].  
+    [assert_entry(E1, <<"asd 0">>, 1),
+     assert_entry(E2, <<"asd 1">>, 2)].  
 
 write_4_read_middle_2(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 2, 2),
-    [assertEntry(E1, <<"asd 1">>, 2),
-     assertEntry(E2, <<"asd 2">>, 3)].  
+    [assert_entry(E1, <<"asd 1">>, 2),
+     assert_entry(E2, <<"asd 2">>, 3)].  
 
 write_4_read_last_2(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 3, 2),
-    [assertEntry(E1, <<"asd 2">>, 3),
-     assertEntry(E2, <<"asd 3">>, 4)].  
+    [assert_entry(E1, <<"asd 2">>, 3),
+     assert_entry(E2, <<"asd 3">>, 4)].  
 
 write_4_read_past_end(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 3, 20),
-    [assertEntry(E1, <<"asd 2">>, 3),
-     assertEntry(E2, <<"asd 3">>, 4)].  
+    [assert_entry(E1, <<"asd 2">>, 3),
+     assert_entry(E2, <<"asd 3">>, 4)].  
 
 write_4_read_out_of_bounds_end(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
@@ -147,26 +147,26 @@ write_4_close_read_all(Sblob) ->
 write_4_close_read_first_2(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 1, 2),
-    [assertEntry(E1, <<"asd 0">>, 1),
-     assertEntry(E2, <<"asd 1">>, 2)].  
+    [assert_entry(E1, <<"asd 0">>, 1),
+     assert_entry(E2, <<"asd 1">>, 2)].  
 
 write_4_close_read_middle_2(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 2, 2),
-    [assertEntry(E1, <<"asd 1">>, 2),
-     assertEntry(E2, <<"asd 2">>, 3)].  
+    [assert_entry(E1, <<"asd 1">>, 2),
+     assert_entry(E2, <<"asd 2">>, 3)].  
 
 write_4_close_read_last_2(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 3, 2),
-    [assertEntry(E1, <<"asd 2">>, 3),
-     assertEntry(E2, <<"asd 3">>, 4)].  
+    [assert_entry(E1, <<"asd 2">>, 3),
+     assert_entry(E2, <<"asd 3">>, 4)].  
 
 write_4_close_read_past_end(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, [E1, E2]} = sblob:get(Sblob1, 3, 20),
-    [assertEntry(E1, <<"asd 2">>, 3),
-     assertEntry(E2, <<"asd 3">>, 4)].  
+    [assert_entry(E1, <<"asd 2">>, 3),
+     assert_entry(E2, <<"asd 3">>, 4)].  
 
 write_4_close_read_out_of_bounds_end(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
