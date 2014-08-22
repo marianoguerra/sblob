@@ -6,11 +6,19 @@
           base_seqnum=0}).
 
 -record(sblob, {
+          % path to sblob file (folder path)
           path,
+          % sblob file name
           name,
+          % joined path and name
           fullpath,
+          % file handle to sblob, it will be opened when needed if nil
           handle=nil,
+          % current read position, used to avoid calling file:position each
+          % time to know where we are
           position=nil,
+          % current file size, used to know the offset of the next inserted
+          % blob and for stats
           size=nil,
           % holds the seqnum of the last inserted blob, if it's 0 it means
           % no inserted blob
@@ -27,10 +35,13 @@
           % from here the ones written to disk in order
           timestamp,
           seqnum,
+          % len of the data
           len,
           data,
           % until here, len is written once again after data
+          % offset of the blob in the file in bytes
           offset,
+          % size of the full blob (header + data + footer)
           size}).
 
 -record(sblob_stats, {
