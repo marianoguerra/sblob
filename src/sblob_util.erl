@@ -21,12 +21,6 @@ parse_config([{read_ahead, Val}|T], Config) ->
 parse_config([{max_items, Val}|T], Config) ->
     parse_config(T, Config#sblob_cfg{max_items=Val});
 
-parse_config([{max_age_ms, Val}|T], Config) ->
-    parse_config(T, Config#sblob_cfg{max_age_ms=Val});
-
-parse_config([{max_size_bytes, Val}|T], Config) ->
-    parse_config(T, Config#sblob_cfg{max_size_bytes=Val});
-
 parse_config([{base_seqnum, Val}|T], Config) ->
     parse_config(T, Config#sblob_cfg{base_seqnum=Val});
 

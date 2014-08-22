@@ -325,17 +325,12 @@ to_from_binary_test() ->
 parse_empty_config_test() ->
     Cfg = sblob_util:parse_config([]),
     ?assertEqual(Cfg#sblob_cfg.max_items, 4096),
-    ?assertEqual(Cfg#sblob_cfg.max_age_ms, nil),
-    ?assertEqual(Cfg#sblob_cfg.max_size_bytes, 4194304),
     ?assertEqual(Cfg#sblob_cfg.base_seqnum, 0),
     ?assertEqual(Cfg#sblob_cfg.read_ahead, 65536).
 
 parse_config_test() ->
-    Cfg = sblob_util:parse_config([{max_items, 1}, {max_age_ms, 12},
-                                   {max_size_bytes, 42}, {base_seqnum, 50},
+    Cfg = sblob_util:parse_config([{max_items, 1}, {base_seqnum, 50},
                                    {read_ahead, 0}]),
     ?assertEqual(Cfg#sblob_cfg.max_items, 1),
-    ?assertEqual(Cfg#sblob_cfg.max_age_ms, 12),
-    ?assertEqual(Cfg#sblob_cfg.max_size_bytes, 42),
     ?assertEqual(Cfg#sblob_cfg.base_seqnum, 50),
     ?assertEqual(Cfg#sblob_cfg.read_ahead, 0).
