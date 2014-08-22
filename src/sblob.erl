@@ -38,16 +38,16 @@ put(Sblob, Data) ->
 
 put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
     {Handle, Sblob1} = sblob_util:get_handle(Sblob),
-    Blob = sblob_util:to_binary(Timestamp, SeqNum, Data),
+    NewSeqNum = SeqNum + 1,
+    Blob = sblob_util:to_binary(Timestamp, NewSeqNum, Data),
     ok = file:write(Handle, Blob),
 
     EntryOffset = Size,
-    NewIndex = sblob_idx:put(Index, SeqNum, EntryOffset),
+    NewIndex = sblob_idx:put(Index, NewSeqNum, EntryOffset),
     BlobSize = size(Blob),
     NewSize = Size + BlobSize,
 
-    NewSeqNum = SeqNum + 1,
-    Entry = #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=size(Data),
+    Entry = #sblob_entry{timestamp=Timestamp, seqnum=NewSeqNum, len=size(Data),
                          data=Data, size=BlobSize, offset=EntryOffset},
 
     Sblob2 = Sblob1#sblob{seqnum=NewSeqNum, index=NewIndex, size=NewSize},

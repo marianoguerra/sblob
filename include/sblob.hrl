@@ -12,6 +12,8 @@
           handle=nil,
           position=nil,
           size=nil,
+          % holds the seqnum of the last inserted blob, if it's 0 it means
+          % no inserted blob
           seqnum=nil,
           % base_seqnum here is the observed base_seqnum of the first entry
           % the one in config is the one to use in case we are opening a
