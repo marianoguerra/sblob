@@ -2,6 +2,7 @@
 
 -export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3]).
 
+-include_lib("eunit/include/eunit.hrl").
 -include("gblob.hrl").
 -include("sblob.hrl").
 

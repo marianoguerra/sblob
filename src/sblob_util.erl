@@ -120,8 +120,8 @@ get_next(Sblob) ->
                                     offset=EntryOffset,
                                     size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
 
-    BlobSeqnum = Entry#sblob_entry.seqnum,
-    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqnum, EntryOffset),
+    BlobSeqNum = Entry#sblob_entry.seqnum,
+    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqNum, EntryOffset),
     Sblob3 = Sblob2#sblob{index=NewIndex},
 
     {Sblob3, Entry}.

@@ -6,6 +6,7 @@
          get_blob_indexes_from_list/1, get_blob_indexes/1,
          get_blob_index_limits/1]).
 
+-include_lib("eunit/include/eunit.hrl").
 -include("gblob.hrl").
 -include("sblob.hrl").
 

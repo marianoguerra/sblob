@@ -2,6 +2,7 @@
 
 -export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3, stats/1]).
 
+-include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
 
 open(Path, Name, Opts) ->
@@ -9,8 +10,8 @@ open(Path, Name, Opts) ->
     AbsPath = filename:absname(Path),
     FullPath = filename:join([AbsPath, Name]),
 
-    #sblob_cfg{base_seqnum=BaseSeqnum, max_items=MaxItems} = Config,
-    Index = sblob_idx:new(BaseSeqnum, MaxItems),
+    #sblob_cfg{base_seqnum=BaseSeqNum, max_items=MaxItems} = Config,
+    Index = sblob_idx:new(BaseSeqNum, MaxItems),
 
     ok = filelib:ensure_dir(FullPath),
     Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config,
@@ -55,8 +56,8 @@ get(Sblob, SeqNum) ->
     sblob_util:handle_get_one(get(Sblob, SeqNum, 1)).
 
 get(Sblob, SeqNum, Count) ->
-    {OffsetSeqnum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
-    {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqnum, SeqNum, false),
+    {OffsetSeqNum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
+    {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqNum, SeqNum, false),
     {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, LastSeqNum, SeqNum + Count, true),
     {Sblob3, Entries}.
 
