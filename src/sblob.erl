@@ -52,10 +52,7 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
     {Sblob2, Entry}.
 
 get(Sblob, SeqNum) ->
-    case get(Sblob, SeqNum, 1) of
-        {NewSblob, []} -> {NewSblob, notfound};
-        {NewSblob, [Entry]} -> {NewSblob, Entry}
-    end.
+    sblob_util:handle_get_one(get(Sblob, SeqNum, 1)).
 
 get(Sblob, SeqNum, Count) ->
     {OffsetSeqnum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),

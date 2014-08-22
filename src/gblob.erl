@@ -50,15 +50,14 @@ rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum}=Gblob) ->
     {Gblob2, _NewCurrent} = gblob_util:get_current(Gblob1, LastSeqNum),
     Gblob2.
 
-% TODO: make it span more than on sblob
 get(Gblob, SeqNum) ->
-    {Gblob1, Sblob} = gblob_util:get_current(Gblob),
-    {Sblob1, Result} = sblob:get(Sblob, SeqNum),
-    Gblob2 = Gblob1#gblob{current=Sblob1},
-    {Gblob2, Result}.
+    sblob_util:handle_get_one(get(Gblob, SeqNum, 1)).
 
 % TODO: make it span more than on sblob
 get(Gblob, SeqNum, Count) ->
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
+    BaseSeqNum = Sblob#sblob.base_seqnum,
+    SeqNumIsAfter = (SeqNum >= BaseSeqNum),
+    true = SeqNumIsAfter,
     {Sblob1, Result} = sblob:get(Sblob, SeqNum, Count),
     {Gblob1#gblob{current=Sblob1}, Result}.

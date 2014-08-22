@@ -2,6 +2,7 @@
 -export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1,
+         handle_get_one/1,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
@@ -167,3 +168,8 @@ read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
             read_until(Sblob1, Blob#sblob_entry.seqnum + 1, TargetSeqNum, Accumulate, NewAccum)
     end.
 
+handle_get_one(Result) ->
+    case Result of
+        {First, []} -> {First, notfound};
+        {First, [Entry]} -> {First, Entry}
+    end.
