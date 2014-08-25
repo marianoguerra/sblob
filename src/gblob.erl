@@ -10,12 +10,7 @@ open(Path, Opts) ->
     AbsPath = filename:absname(Path),
     Config = gblob_util:parse_config(Opts),
     ok = filelib:ensure_dir(filename:join([AbsPath, "sblob"])),
-    {FirstIdx, LastIdx} = gblob_util:get_blob_index_limits(AbsPath),
-    BaseFileNum = FirstIdx,
-    IndexSize = LastIdx - FirstIdx + 1,
-    Index = sblob_idx:new(BaseFileNum, IndexSize),
-    #gblob{path=AbsPath, min_chunk_num=FirstIdx, max_chunk_num=LastIdx,
-          config=Config, index=Index}.
+    #gblob{path=AbsPath, config=Config}.
 
 close(#gblob{current=nil}=Gblob) ->
     Gblob;
@@ -43,6 +38,10 @@ put(Gblob, Timestamp, Data) ->
         true -> Gblob2
     end,
     {Gblob3, Entry}.
+
+rotate(#gblob{index=nil}=Gblob) ->
+    {GblobWithIndex, _Index} = gblob_util:get_index(Gblob),
+    rotate(GblobWithIndex);
 
 rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum, index=Index}=Gblob) ->
     Sblob1 = sblob:close(Sblob),

@@ -4,6 +4,7 @@
          should_rotate/1,
          path_for_chunk_num/2,
          seqread/3,
+         get_index/1,
          get_blob_indexes_from_list/1, get_blob_indexes/1,
          get_blob_index_limits/1]).
 
@@ -44,6 +45,10 @@ sblob_for_chunk_num(Gblob, Num) ->
 sblob_for_chunk_num(#gblob{path=Path}, Num, Opts) ->
     Name = chunk_name(Num),
     sblob:open(Path, Name, Opts).
+
+get_last_seqnum(#gblob{index=nil}=Gblob) ->
+    {GblobWithIndex, _Index} = get_index(Gblob),
+    get_last_seqnum(GblobWithIndex);
 
 get_last_seqnum(#gblob{max_chunk_num=MaxChunkNum}=Gblob) ->
     if
@@ -115,15 +120,26 @@ get_read_ahead_config(#sblob{config=Config}) ->
 get_read_ahead_config(#gblob{current=Sblob}) -> 
     get_read_ahead_config(Sblob).
 
-do_seqread(#gblob{index=Index}=Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
+get_index(#gblob{index=nil, path=Path}=Gblob) ->
+    {FirstIdx, LastIdx} = gblob_util:get_blob_index_limits(Path),
+    BaseFileNum = FirstIdx,
+    IndexSize = LastIdx - FirstIdx + 1,
+    Index = sblob_idx:new(BaseFileNum, IndexSize),
+    {Gblob#gblob{min_chunk_num=FirstIdx, max_chunk_num=LastIdx, index=Index}, Index};
+
+get_index(#gblob{index=Index}=Gblob) ->
+    {Gblob, Index}.
+
+do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
+    {Gblob1, Index} = get_index(Gblob),
     {NewGblob, Result, NewSeqNum, ReadCount} =
         case sblob_util:seqread(Path, ChunkName, SeqNum, Count, ReadAhead) of
             {R1, nil, nil, Rc1} ->
-                {Gblob, R1, SeqNum + Rc1, Rc1};
+                {Gblob1, R1, SeqNum + Rc1, Rc1};
             {R2, FirstSeqNum, _LastSeqNum, Rc2} ->
                 NewIndex = sblob_idx:put(Index, ChunkNum, FirstSeqNum),
-                Gblob1 = Gblob#gblob{index=NewIndex},
-                {Gblob1, R2, SeqNum + Rc2, Rc2}
+                Gblob2 = Gblob1#gblob{index=NewIndex},
+                {Gblob2, R2, SeqNum + Rc2, Rc2}
         end,
     NewAccum = [Result|Accum],
     NewCount = Count - ReadCount,
@@ -149,12 +165,13 @@ seqread(#gblob{path=Path}=Gblob, ChunkNum, SeqNum, Count, ReadAhead, Accum) ->
     do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum).
 
 seqread(#gblob{index=Idx}=Gblob, SeqNum, Count) ->
+    {Gblob1, Idx} = get_index(Gblob),
     BaseChunk = case sblob_idx:closest_value(Idx, SeqNum) of
         notfound -> 1;
         {ChunkNum, _} -> ChunkNum
     end,
 
-    ReadAhead = get_read_ahead_config(Gblob),
-    {Gblob1, NestedResult} = seqread(Gblob, BaseChunk, SeqNum, Count, ReadAhead, []),
+    ReadAhead = get_read_ahead_config(Gblob1),
+    {Gblob2, NestedResult} = seqread(Gblob1, BaseChunk, SeqNum, Count, ReadAhead, []),
     Result = lists:flatten(NestedResult),
-    {Gblob1, Result}.
+    {Gblob2, Result}.
