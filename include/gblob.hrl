@@ -9,6 +9,7 @@
           path,
           % current sblob, will be opened only when required
           current=nil,
+          index=nil,
           min_chunk_num=0,
           max_chunk_num=0,
           config=#gblob_cfg{}}).

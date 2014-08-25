@@ -49,3 +49,25 @@ put_two_closest_test() ->
     {Key, Val} = sblob_idx:closest(Idx2, 25),
     ?assertEqual(Key, 24),
     ?assertEqual(Val, b).
+
+cv_notfound_test() ->
+    Idx = sblob_idx:new(22, 10),
+    ?assertEqual(sblob_idx:closest_value(Idx, 42), notfound).
+
+cv_found_test() ->
+    Idx = sblob_idx:new(22, 10),
+    Idx1 = sblob_idx:put(Idx, 25, 500),
+    ?assertEqual(sblob_idx:closest_value(Idx1, 501), {25, 500}).
+
+cv_found_closest_test() ->
+    Idx = sblob_idx:new(22, 10),
+    Idx1 = sblob_idx:put(Idx, 25, 500),
+    Idx2 = sblob_idx:put(Idx1, 28, 510),
+    ?assertEqual(sblob_idx:closest_value(Idx2, 501), {25, 500}).
+
+cv_found_closest_1_test() ->
+    Idx = sblob_idx:new(22, 10),
+    Idx1 = sblob_idx:put(Idx, 22, 400),
+    Idx2 = sblob_idx:put(Idx1, 25, 500),
+    Idx3 = sblob_idx:put(Idx2, 28, 510),
+    ?assertEqual(sblob_idx:closest_value(Idx3, 501), {25, 500}).

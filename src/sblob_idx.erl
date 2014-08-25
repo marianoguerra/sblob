@@ -1,5 +1,5 @@
 -module(sblob_idx).
--export([new/1, new/2, put/3, closest/2]).
+-export([new/1, new/2, put/3, closest/2, closest_value/2, expand/2]).
 
 -record(sblob_idx, {base_key=0, data}).
 -define(SBLOB_IDX_DEFAULT_INDEX_SIZE, 256).
@@ -39,3 +39,18 @@ closest(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->
         _ -> {Key, Val}
     end.
 
+% get the index that has the closest value to Val, if array is empty or there
+% are no values set that are <= to Val return notfound.
+% NOTE: see if using sparse_fold is faster than transversing the whole array
+closest_value(#sblob_idx{data=Data, base_key=BaseKey}, Val) ->
+    array:sparse_foldl(fun (I, CVal, Accum) ->
+                               if CVal =< Val -> {I + BaseKey, CVal};
+                                  true -> Accum
+                               end
+                       end, notfound, Data).
+
+expand(#sblob_idx{data=Data}=Idx, Count) ->
+    IndexSize = array:size(Data),
+    NewIndexSize = IndexSize + Count,
+    NewData = array:resize(NewIndexSize, Data),
+    Idx#sblob_idx{data=NewData}.

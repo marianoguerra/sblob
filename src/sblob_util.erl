@@ -2,7 +2,7 @@
 -export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1,
-         handle_get_one/1,
+         handle_get_one/1, seqread/5,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
@@ -28,12 +28,16 @@ parse_config([{base_seqnum, Val}|T], Config) ->
 parse_config([], Config) ->
     Config.
 
+open_file(Path, ReadAhead) ->
+    {ok, Handle} = file:open(Path, [append, read, raw, binary,
+                                    {read_ahead, ReadAhead}]),
+    Handle.
+
 % return the file handle to the current chunk, if not open already open it
 % and store it in the returned Sblob record
 get_handle(#sblob{fullpath=FullPath,
                   config=#sblob_cfg{read_ahead=ReadAhead}}=Sblob) ->
-    {ok, Handle} = file:open(FullPath, [append, read, raw, binary,
-                                    {read_ahead, ReadAhead}]),
+    Handle = open_file(FullPath, ReadAhead),
     {ok, Size} = file:position(Handle, eof),
     {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}}.
 
@@ -107,6 +111,20 @@ remove(Path) ->
 offset_for_seqnum(#sblob{index=Idx}, SeqNum) -> 
     sblob_idx:closest(Idx, SeqNum).
 
+raw_get_next(Handle) ->
+     case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
+         {ok, Header} ->
+
+             HeaderEntry = header_from_binary(Header),
+             Len = HeaderEntry#sblob_entry.len,
+             {ok, Tail} = file:read(Handle, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
+             Data = binary:part(Tail, 0, Len),
+             Entry = HeaderEntry#sblob_entry{data=Data,
+                                             size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
+             Entry;
+         eof -> eof
+     end.
+
 get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {Sblob, notfound};
 
 get_next(Sblob) ->
@@ -173,3 +191,33 @@ handle_get_one(Result) ->
         {First, []} -> {First, notfound};
         {First, [Entry]} -> {First, Entry}
     end.
+
+seqread_raw(Handle, _SeqNum, FirstSeqNum, LastSeqNum, 0, Count, Accum) ->
+    file:close(Handle),
+    Result = lists:reverse(Accum),
+    {Result, FirstSeqNum, LastSeqNum, Count};
+
+seqread_raw(Handle, SeqNum, FirstSeqNum, LastSeqNum, Remaining, Count, Accum) ->
+    case raw_get_next(Handle) of
+        eof ->
+            seqread_raw(Handle, SeqNum, FirstSeqNum, LastSeqNum, 0, Count, Accum);
+        (#sblob_entry{seqnum=EntrySeqNum}=Entry) ->
+            NewFirstSeqNum = if
+                                 FirstSeqNum =:= nil -> EntrySeqNum;
+                                 true -> FirstSeqNum
+                             end,
+            if
+                EntrySeqNum >= SeqNum ->
+                    seqread_raw(Handle, SeqNum, NewFirstSeqNum, EntrySeqNum,
+                                Remaining - 1, Count + 1, [Entry|Accum]);
+                true ->
+                    seqread_raw(Handle, SeqNum, NewFirstSeqNum, EntrySeqNum,
+                                Remaining, Count, Accum)
+            end
+    end.
+
+seqread(Path, ChunkName, SeqNum, Count, ReadAhead) ->
+    SblobPath = filename:join([Path, ChunkName]),
+    Handle = open_file(SblobPath, ReadAhead),
+    seqread_raw(Handle, SeqNum, nil, nil, Count, 0, []).
+

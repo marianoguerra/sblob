@@ -40,7 +40,12 @@ usage_test_() ->
       fun write_4_close_read_middle_2/1,
       fun write_4_close_read_last_2/1,
       fun write_4_close_read_past_end/1,
-      fun write_4_close_read_out_of_bounds_end/1
+      fun write_4_close_read_out_of_bounds_end/1,
+
+      fun write_4_close_read_all_raw/1,
+      fun write_4_close_read_first_2_raw/1,
+      fun write_4_close_read_middle_2_raw/1,
+      fun write_4_close_read_last_2_raw/1
      ]}.
 
 reopen(#sblob{path=Path, name=Name}=Sblob) ->
@@ -172,6 +177,60 @@ write_4_close_read_out_of_bounds_end(Sblob) ->
     Sblob1 = reopen(write_many(Sblob, "asd ", 4)),
     {_Sblob2, Result} = sblob:get(Sblob1, 5, 20),
     ?_assertEqual(Result, []).
+
+write_4_close_read_all_raw(#sblob{path=Path, name=ChunkName}=Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    _Sblob2 = sblob:close(Sblob1),
+    ReadAhead = 65536,
+    Count = 4,
+    SeqNum = 1,
+    {[E1, E2, E3, E4], RFirstSN, RSeqNum, RCount} = sblob_util:seqread(Path, ChunkName, SeqNum, Count, ReadAhead),
+    [?_assertEqual(RSeqNum, 4),
+     ?_assertEqual(RFirstSN, 1),
+     ?_assertEqual(RCount, 4),
+     assert_entry(E1, <<"asd 0">>, 1),
+     assert_entry(E2, <<"asd 1">>, 2),
+     assert_entry(E3, <<"asd 2">>, 3),
+     assert_entry(E4, <<"asd 3">>, 4)].
+
+write_4_close_read_first_2_raw(#sblob{path=Path, name=ChunkName}=Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    _Sblob2 = sblob:close(Sblob1),
+    ReadAhead = 65536,
+    Count = 2,
+    SeqNum = 1,
+    {[E1, E2], RFirstSN, RSeqNum, RCount} = sblob_util:seqread(Path, ChunkName, SeqNum, Count, ReadAhead),
+    [?_assertEqual(RSeqNum, 2),
+     ?_assertEqual(RFirstSN, 1),
+     ?_assertEqual(RCount, 2),
+     assert_entry(E1, <<"asd 0">>, 1),
+     assert_entry(E2, <<"asd 1">>, 2)].
+
+write_4_close_read_middle_2_raw(#sblob{path=Path, name=ChunkName}=Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    _Sblob2 = sblob:close(Sblob1),
+    ReadAhead = 65536,
+    Count = 2,
+    SeqNum = 2,
+    {[E2, E3], RFirstSN, RSeqNum, RCount} = sblob_util:seqread(Path, ChunkName, SeqNum, Count, ReadAhead),
+    [?_assertEqual(RSeqNum, 3),
+     ?_assertEqual(RFirstSN, 1),
+     ?_assertEqual(RCount, 2),
+     assert_entry(E2, <<"asd 1">>, 2),
+     assert_entry(E3, <<"asd 2">>, 3)].
+
+write_4_close_read_last_2_raw(#sblob{path=Path, name=ChunkName}=Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    _Sblob2 = sblob:close(Sblob1),
+    ReadAhead = 65536,
+    Count = 4,
+    SeqNum = 3,
+    {[E3, E4], RFirstSN, RSeqNum, RCount} = sblob_util:seqread(Path, ChunkName, SeqNum, Count, ReadAhead),
+    [?_assertEqual(RSeqNum, 4),
+     ?_assertEqual(RFirstSN, 1),
+     ?_assertEqual(RCount, 2),
+     assert_entry(E3, <<"asd 2">>, 3),
+     assert_entry(E4, <<"asd 3">>, 4)].
 
 no_write_stats(Sblob) ->
     Stats = sblob:stats(Sblob),

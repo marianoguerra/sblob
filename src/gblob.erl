@@ -11,8 +11,11 @@ open(Path, Opts) ->
     Config = gblob_util:parse_config(Opts),
     ok = filelib:ensure_dir(filename:join([AbsPath, "sblob"])),
     {FirstIdx, LastIdx} = gblob_util:get_blob_index_limits(AbsPath),
+    BaseFileNum = FirstIdx,
+    IndexSize = LastIdx - FirstIdx + 1,
+    Index = sblob_idx:new(BaseFileNum, IndexSize),
     #gblob{path=AbsPath, min_chunk_num=FirstIdx, max_chunk_num=LastIdx,
-          config=Config}.
+          config=Config, index=Index}.
 
 close(#gblob{current=nil}=Gblob) ->
     Gblob;
@@ -41,24 +44,30 @@ put(Gblob, Timestamp, Data) ->
     end,
     {Gblob3, Entry}.
 
-rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum}=Gblob) ->
+rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum, index=Index}=Gblob) ->
     Sblob1 = sblob:close(Sblob),
     NewChunkNum = ChunkNum + 1,
     #sblob{seqnum=LastSeqNum, fullpath=SblobPath} = Sblob1,
     NewPath = gblob_util:path_for_chunk_num(Gblob, NewChunkNum),
     ok = file:rename(SblobPath, NewPath),
-    Gblob1 = Gblob#gblob{max_chunk_num=NewChunkNum, current=nil},
+    NewIndex = sblob_idx:expand(Index, 1),
+    Gblob1 = Gblob#gblob{max_chunk_num=NewChunkNum, current=nil, index=NewIndex},
     {Gblob2, _NewCurrent} = gblob_util:get_current(Gblob1, LastSeqNum),
     Gblob2.
 
 get(Gblob, SeqNum) ->
     sblob_util:handle_get_one(get(Gblob, SeqNum, 1)).
 
-% TODO: make it span more than on sblob
 get(Gblob, SeqNum, Count) ->
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
     BaseSeqNum = Sblob#sblob.base_seqnum,
     SeqNumIsAfter = (SeqNum >= BaseSeqNum),
-    true = SeqNumIsAfter,
-    {Sblob1, Result} = sblob:get(Sblob, SeqNum, Count),
-    {Gblob1#gblob{current=Sblob1}, Result}.
+    {Gblob2, Result} = if
+        SeqNumIsAfter ->
+           {Sblob1, Res} = sblob:get(Sblob, SeqNum, Count),
+           {Gblob1#gblob{current=Sblob1}, Res};
+        true ->
+            gblob_util:seqread(Gblob, SeqNum, Count)
+    end,
+
+    {Gblob2, Result}.
