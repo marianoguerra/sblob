@@ -7,6 +7,6 @@
   {modules, []},
   {applications, [kernel, stdlib]},
   {registered, []},
-  {mod, {blob, []}},
+  {mod, {sblob, []}},
   {env, []}
  ]}.
