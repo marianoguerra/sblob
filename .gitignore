@@ -1,3 +1,5 @@
 .eunit
 ebin
 notes.txt
+.deps_plt
+deps
