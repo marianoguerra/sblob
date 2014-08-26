@@ -25,7 +25,7 @@ close(#sblob{handle=nil}=Sblob) ->
     lager:debug("close, no handle ~p", [lager:pr(Sblob, ?MODULE)]),
     Sblob;
 close(#sblob{handle=Handle}=Sblob) ->
-    lager:debug("close ~p ~p", [Handle, lager:pr(Sblob, ?MODULE)]),
+    lager:debug("close ~p", [lager:pr(Sblob, ?MODULE)]),
     case file:close(Handle) of
         ok -> ok;
         {error, einval} ->
@@ -43,10 +43,10 @@ put(Sblob, Data) ->
     Now = sblob_util:now(),
     put(Sblob, Now, Data).
 
-put(#sblob{seqnum=SeqNum, index=Index, size=Size, fullpath=FullPath}=Sblob, Timestamp, Data) ->
+put(#sblob{seqnum=SeqNum, index=Index, size=Size, name=Name}=Sblob, Timestamp, Data) ->
     {Handle, Sblob1} = sblob_util:get_handle(Sblob),
     NewSeqNum = SeqNum + 1,
-    lager:debug("put ~p ~p ~p", [FullPath, NewSeqNum, Timestamp]),
+    lager:debug("put ~s ~p ~p", [Name, NewSeqNum, Timestamp]),
     Blob = sblob_util:to_binary(Timestamp, NewSeqNum, Data),
     ok = file:write(Handle, Blob),
 
@@ -66,7 +66,7 @@ get(Sblob, SeqNum) ->
     sblob_util:handle_get_one(get(Sblob, SeqNum, 1)).
 
 get(#sblob{fullpath=FullPath}=Sblob, SeqNum, Count) ->
-    lager:debug("get ~p ~p ~p", [FullPath, SeqNum, Count]),
+    lager:debug("get ~s ~p ~p", [FullPath, SeqNum, Count]),
     {OffsetSeqNum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
     {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqNum, SeqNum, false),
     {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, LastSeqNum, SeqNum + Count, true),
