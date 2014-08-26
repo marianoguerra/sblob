@@ -3,6 +3,7 @@
 -include("sblob.hrl").
 
 usage_test_() ->
+    ?debugMsg("starting sblob usage tests"),
     {foreach,
      fun usage_start/0,
      fun usage_stop/1,

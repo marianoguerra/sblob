@@ -17,15 +17,24 @@ open(Path, Name, Opts) ->
     Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config,
            index=Index},
 
-    sblob_util:fill_bounds(Sblob).
+    Result = sblob_util:fill_bounds(Sblob),
+    lager:debug("open ~p", [lager:pr(Result, ?MODULE)]),
+    Result.
 
 close(#sblob{handle=nil}=Sblob) ->
+    lager:debug("close, no handle ~p", [lager:pr(Sblob, ?MODULE)]),
     Sblob;
 close(#sblob{handle=Handle}=Sblob) ->
-    file:close(Handle),
+    lager:debug("close ~p ~p", [Handle, lager:pr(Sblob, ?MODULE)]),
+    case file:close(Handle) of
+        ok -> ok;
+        {error, einval} ->
+            lager:warning("closing invalid file handle? ~p ~p", [Handle, lager:pr(Sblob, ?MODULE)])
+    end,
     Sblob#sblob{handle=nil}.
 
 delete(#sblob{fullpath=FullPath}=Sblob) ->
+    lager:debug("delete ~p", [lager:pr(Sblob, ?MODULE)]),
     NewSblob = close(Sblob),
     ok = sblob_util:remove(FullPath),
     NewSblob.
@@ -34,9 +43,10 @@ put(Sblob, Data) ->
     Now = sblob_util:now(),
     put(Sblob, Now, Data).
 
-put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
+put(#sblob{seqnum=SeqNum, index=Index, size=Size, fullpath=FullPath}=Sblob, Timestamp, Data) ->
     {Handle, Sblob1} = sblob_util:get_handle(Sblob),
     NewSeqNum = SeqNum + 1,
+    lager:debug("put ~p ~p ~p", [FullPath, NewSeqNum, Timestamp]),
     Blob = sblob_util:to_binary(Timestamp, NewSeqNum, Data),
     ok = file:write(Handle, Blob),
 
@@ -55,7 +65,8 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size}=Sblob, Timestamp, Data) ->
 get(Sblob, SeqNum) ->
     sblob_util:handle_get_one(get(Sblob, SeqNum, 1)).
 
-get(Sblob, SeqNum, Count) ->
+get(#sblob{fullpath=FullPath}=Sblob, SeqNum, Count) ->
+    lager:debug("get ~p ~p ~p", [FullPath, SeqNum, Count]),
     {OffsetSeqNum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
     {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqNum, SeqNum, false),
     {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, LastSeqNum, SeqNum + Count, true),

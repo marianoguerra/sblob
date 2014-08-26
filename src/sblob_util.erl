@@ -35,18 +35,23 @@ open_file(Path, ReadAhead) ->
 
 % return the file handle to the current chunk, if not open already open it
 % and store it in the returned Sblob record
-get_handle(#sblob{fullpath=FullPath,
+get_handle(#sblob{fullpath=FullPath, handle=nil,
                   config=#sblob_cfg{read_ahead=ReadAhead}}=Sblob) ->
+    lager:debug("get handle ~p", [FullPath]),
     Handle = open_file(FullPath, ReadAhead),
     {ok, Size} = file:position(Handle, eof),
-    {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}}.
+    {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}};
+
+get_handle(#sblob{handle=Handle}=Sblob) ->
+    {Handle, Sblob}.
 
 % like get_handle but will seek the handle to the required place,
 % Location is the same as file:position
 seek(#sblob{handle=nil}=Sblob, Location) ->
     {_, Sblob1} = get_handle(Sblob),
     seek(Sblob1, Location);
-seek(#sblob{handle=Handle}=Sblob, Location) ->
+seek(#sblob{handle=Handle, name=Name}=Sblob, Location) ->
+    lager:debug("seek ~p ~p", [Name, Location]),
     {ok, NewPos} = file:position(Handle, Location),
     Sblob#sblob{position=NewPos}.
 
@@ -59,16 +64,19 @@ seek_to_seqnum(Sblob, SeqNum) ->
     {ok, NewPos} = file:position(Handle, {bof, Offset}),
     {OffsetKey, NewSblob#sblob{position=NewPos}}.
 
-fill_bounds(Sblob) ->
+fill_bounds(#sblob{name=Name}=Sblob) ->
     {Sblob1, Last} = get_first(Sblob),
     Cfg = Sblob1#sblob.config,
     CfgBaseSeqNum = Cfg#sblob_cfg.base_seqnum,
     case Last of
         notfound -> 
+            lager:debug("fill bounds, empty ~p", [Name]),
             Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum, size=0};
         #sblob_entry{seqnum=FirstSeqNum} ->
             {Sblob2, #sblob_entry{seqnum=LastSeqNum}} = get_last(Sblob1),
-            Sblob2#sblob{base_seqnum=FirstSeqNum - 1, seqnum=LastSeqNum}
+            BaseSeqNum = FirstSeqNum  - 1,
+            lager:debug("fill bounds ~p ~p - ~p", [Name, BaseSeqNum, LastSeqNum]),
+            Sblob2#sblob{base_seqnum=BaseSeqNum, seqnum=LastSeqNum}
     end.
 
 read(#sblob{handle=nil}=Sblob, Len) ->
@@ -109,7 +117,9 @@ remove(Path) ->
     ok = file:rename(Path, Path ++ "." ++ NowStr ++ ".removed").
 
 offset_for_seqnum(#sblob{index=Idx}, SeqNum) -> 
-    sblob_idx:closest(Idx, SeqNum).
+    Result = sblob_idx:closest(Idx, SeqNum),
+    lager:debug("offset for seqnum ~p: ~p", [SeqNum, Result]),
+    Result.
 
 raw_get_next(Handle) ->
      case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
@@ -144,11 +154,13 @@ get_next(Sblob) ->
 
     {Sblob3, Entry}.
 
-get_first(Sblob) ->
+get_first(#sblob{fullpath=FullPath}=Sblob) ->
+    lager:debug("get_first ~p", [FullPath]),
     NewSblob = seek(Sblob, bof),
     get_next(NewSblob).
 
-get_last(Sblob) ->
+get_last(#sblob{fullpath=FullPath}=Sblob) ->
+    lager:debug("get_last ~p", [FullPath]),
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
 
     Sblob1 = seek(Sblob, {eof, -LenSize}),
@@ -164,7 +176,8 @@ get_last(Sblob) ->
     get_next(Sblob3).
 
 
-read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
+read_until(#sblob{name=Name}=Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
+    lager:debug("read_until ~p ~p ~n", [Name, CurSeqNum, TargetSeqNum]),
     read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, []).
 
 
@@ -217,6 +230,7 @@ seqread_raw(Handle, SeqNum, FirstSeqNum, LastSeqNum, Remaining, Count, Accum) ->
     end.
 
 seqread(Path, ChunkName, SeqNum, Count, ReadAhead) ->
+    lager:debug("read_until ~p ~p ~n", [ChunkName, SeqNum, Count]),
     SblobPath = filename:join([Path, ChunkName]),
     Handle = open_file(SblobPath, ReadAhead),
     seqread_raw(Handle, SeqNum, nil, nil, Count, 0, []).
