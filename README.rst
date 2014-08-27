@@ -47,4 +47,4 @@ to run all tests:
 
 to test one module::
 
-    ./rebar eunit suites=gblob_tests
+    ./rebar eunit suites=gblob_tests skip_deps=true

@@ -21,7 +21,8 @@ usage_test_() ->
       fun write_4_in_two_parts_read_all/1,
       fun write_100_in_two_parts_read_all/1,
       fun write_rotate_reopen_write/1,
-      fun write_rotate_write_reopen_write/1
+      fun write_rotate_write_reopen_write/1,
+      fun nil_seqnum_returns_last/1
      ]}.
 
 reopen(#gblob{path=Path}=Gblob) ->
@@ -155,6 +156,16 @@ write_rotate_write_reopen_write(Gblob) ->
      assert_entry(E3, <<"item 1">>, 13),
      assert_entry(E4, <<"item 2">>, 14),
      assert_entry(E5, <<"item 3">>, 15)].
+
+nil_seqnum_returns_last(Gblob) ->
+    Gblob1 = write_many(Gblob, 15),
+    {_Gblob2, Result} = gblob:get(Gblob1, nil, 10),
+    Indexes = lists:seq(5, 14),
+    Items = lists:zip(Indexes, Result),
+    lists:map(fun ({I, Entity}) ->
+                      Data = num_to_data(I - 1),
+                      assert_entry(Entity, Data, I)
+              end, Items).
 
 open_test() ->
     Path = "gblob",

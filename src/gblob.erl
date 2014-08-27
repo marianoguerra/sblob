@@ -57,6 +57,16 @@ rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum, index=Index}=Gblob) ->
 get(Gblob, SeqNum) ->
     sblob_util:handle_get_one(get(Gblob, SeqNum, 1)).
 
+get(Gblob, nil, Count) ->
+    {Gblob1, Sblob} = gblob_util:get_current(Gblob),
+    SeqNum = Sblob#sblob.seqnum - Count,
+
+    SeqNum1 = if SeqNum < 0 -> 0;
+                 true -> SeqNum
+              end,
+
+    get(Gblob1, SeqNum1, Count);
+
 get(Gblob, SeqNum, Count) ->
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
     BaseSeqNum = Sblob#sblob.base_seqnum,
