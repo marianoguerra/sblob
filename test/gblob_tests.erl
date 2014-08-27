@@ -18,6 +18,8 @@ usage_test_() ->
       fun write_100_read_last_50/1,
       fun write_100_read_some_50/1,
       fun write_100_read_some/1,
+      fun write_4_in_two_parts_read_all/1,
+      fun write_100_in_two_parts_read_all/1,
       fun write_rotate_reopen_write/1,
       fun write_rotate_write_reopen_write/1
      ]}.
@@ -44,11 +46,14 @@ num_to_data(Num) ->
     list_to_binary(Str).
 
 write_many(Gblob, Count) ->
+    write_many(Gblob, Count, 0).
+
+write_many(Gblob, Count, Offset) ->
     lists:foldl(fun (I, GblobIn) ->
                        Data = num_to_data(I),
                        {GblobOut, _} = gblob:put(GblobIn, Data),
                        GblobOut
-               end, Gblob, lists:seq(0, Count - 1)).
+               end, Gblob, lists:seq(Offset, Offset + Count - 1)).
 
 write_100(Gblob) ->
     Gblob1 = write_many(Gblob, 99),
@@ -69,12 +74,18 @@ write_100_read_1(Gblob) ->
     [assert_entry(E1, <<"item 47">>, 48)].
 
 read_N(Gblob, StartSN, ReadCount) ->
+    read_N(Gblob, StartSN, ReadCount, false).
+
+read_N(Gblob, StartSN, ReadCount, Verbose) ->
     ?debugFmt("read ~p start at ~p~n", [ReadCount, StartSN]),
     {Gblob1, Result} = gblob:get(Gblob, StartSN, ReadCount),
     Indexes = lists:seq(StartSN - 1, StartSN + ReadCount - 2),
     Items = lists:zip(Indexes, Result),
     {Gblob1, lists:map(fun ({I, Entity}) ->
                       Data = num_to_data(I),
+                      if Verbose -> ?debugFmt("~p ~p~n", [I, Entity]);
+                         true -> ok
+                       end,
                       assert_entry(Entity, Data, I + 1)
               end, Items)}.
 
@@ -97,6 +108,18 @@ write_100_read_middle_50(Gblob) ->
 
 write_100_read_some_50(Gblob) ->
     write_N_read_N(Gblob, 100, 33, 50).
+
+write_100_in_two_parts_read_all(Gblob) ->
+    Gblob1 = write_many(Gblob, 50),
+    Gblob2 = write_many(Gblob1, 50, 50),
+    {_Gblob3, Tests} = read_N(Gblob2, 1, 100),
+    Tests.
+
+write_4_in_two_parts_read_all(Gblob) ->
+    Gblob1 = write_many(Gblob, 2),
+    Gblob2 = write_many(Gblob1, 2, 2),
+    {_Gblob3, Tests} = read_N(Gblob2, 1, 4),
+    Tests.
 
 write_100_read_some(Gblob) ->
     Gblob1 = write_many(Gblob, 100),
