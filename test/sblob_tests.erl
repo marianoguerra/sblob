@@ -5,7 +5,7 @@
 usage_test_() ->
     ?debugMsg("starting sblob usage tests"),
     lager:start(),
-    lager:set_loglevel(lager_console_backend, debug),
+    %lager:set_loglevel(lager_console_backend, debug),
     {foreach,
      fun usage_start/0,
      fun usage_stop/1,
@@ -56,14 +56,14 @@ reopen(#sblob{path=Path, name=Name}=Sblob) ->
     sblob:open(Path, Name, []).
 
 usage_start() ->
-    ?debugMsg("S---------------------------------------------------------"),
+    %?debugMsg("S---------------------------------------------------------"),
     Path = "bucket",
     Name = io_lib:format("stream~p", [sblob_util:now()]),
     sblob:open(Path, Name, []).
 
 usage_stop(Sblob) ->
-    sblob:delete(Sblob),
-    ?debugMsg("E---------------------------------------------------------").
+    sblob:delete(Sblob).
+    %?debugMsg("E---------------------------------------------------------").
 
 do_nothing(_Sblob) -> [].
 
