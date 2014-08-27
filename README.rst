@@ -35,3 +35,16 @@ until it finds the closest seqnum (array value) and returns the chunk number
 (array index).
 
 In this case closest means closest lower or equal seqnum.
+
+Testing
+-------
+
+to run all tests:
+
+::
+
+    make eunit
+
+to test one module::
+
+    ./rebar eunit suites=gblob_tests
