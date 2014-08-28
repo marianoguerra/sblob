@@ -56,6 +56,16 @@ rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum, index=Index}=Gblob) ->
 get(Gblob, SeqNum) ->
     sblob_util:handle_get_one(get(Gblob, SeqNum, 1)).
 
+get(Gblob=#gblob{current=nil, path=Path}, SeqNum, Count) ->
+    case filelib:is_dir(Path) of
+        true ->
+            {Gblob1, _Sblob} = gblob_util:get_current(Gblob),
+            get(Gblob1, SeqNum, Count);
+        false ->
+            {Gblob, []}
+    end;
+
+
 get(Gblob, nil, Count) ->
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
     SeqNum = Sblob#sblob.seqnum - Count,
