@@ -23,3 +23,6 @@ endif
 eunit: app
 	ERL_AFLAGS="-s lager" 
 	$(REBAR) skip_deps=true eunit
+
+clean-eunit: clean
+	rm -rf .eunit log
