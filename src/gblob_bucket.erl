@@ -95,7 +95,7 @@ create_gblob(Gblobs, Path, Opts, Id) ->
     {NewGblobs, Gblob}.
 
 get_gblob(#state{gblobs=Gblobs, gblob_opts=Opts, path=Path}=State, Id) ->
-    {NewGblobs, Gblob} = case sblob_preg:get(Gblobs, Id) of 
+    {NewGblobs, Gblob} = case sblob_preg:get(Gblobs, Id) of
         none ->
             IdStr = binary_to_list(Id),
             GblobPath = filename:join([Path, IdStr]),

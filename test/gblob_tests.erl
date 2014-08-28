@@ -172,7 +172,6 @@ open_test() ->
     AbsPath = filename:absname(Path),
     Gblob = gblob:open(Path, []),
     Idx = Gblob#gblob.index,
-    true = filelib:is_dir(Path),
     ?assertEqual(#gblob{path=AbsPath, index=Idx, config=#gblob_cfg{}}, Gblob).
 
 get_blob_indexes_test() ->

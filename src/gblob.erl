@@ -9,7 +9,6 @@
 open(Path, Opts) ->
     AbsPath = filename:absname(Path),
     Config = gblob_util:parse_config(Opts),
-    ok = filelib:ensure_dir(filename:join([AbsPath, "sblob"])),
     #gblob{path=AbsPath, config=Config}.
 
 close(#gblob{current=nil}=Gblob) ->
