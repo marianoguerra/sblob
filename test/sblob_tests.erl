@@ -55,10 +55,14 @@ reopen(#sblob{path=Path, name=Name}=Sblob) ->
     sblob:close(Sblob),
     sblob:open(Path, Name, []).
 
-usage_start() ->
-    %?debugMsg("S---------------------------------------------------------"),
+gen_stream_info() ->
     Path = "bucket",
     Name = io_lib:format("stream~p", [sblob_util:now()]),
+    {Path, Name}.
+
+usage_start() ->
+    %?debugMsg("S---------------------------------------------------------"),
+    {Path, Name} = gen_stream_info(),
     sblob:open(Path, Name, []).
 
 usage_stop(Sblob) ->
@@ -367,14 +371,21 @@ write_two_read_first_and_last(Sblob) ->
      ?_assertEqual(RTData, TWData)].
 
 open_test() ->
-    Path = "foo",
-    Name = "bar",
+    {Path, Name} = gen_stream_info(),
     AbsPath = filename:absname(Path),
     FullPath = filename:join([AbsPath, Name]),
     Sblob = sblob:open(Path, Name, []),
     true = filelib:is_file(FullPath),
-    #sblob{path=AbsPath, fullpath=FullPath, name=Name, seqnum=0,
-           config=#sblob_cfg{}} = Sblob.
+    ?assertEqual(AbsPath, Sblob#sblob.path),
+    ?assertEqual(FullPath, Sblob#sblob.fullpath),
+    ?assertEqual(Name, Sblob#sblob.name),
+    ?assertEqual(0, Sblob#sblob.seqnum),
+    ?assertEqual(#sblob_cfg{}, Sblob#sblob.config).
+
+write_max_items_test() ->
+    {Path, Name} = gen_stream_info(),
+    Sblob = sblob:open(Path, Name, [{max_items, 10}]),
+    _Sblob1 = write_many(Sblob, "asd ", 10).
 
 to_from_binary_test() ->
     Timestamp = 123456,

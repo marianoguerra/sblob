@@ -13,7 +13,12 @@ new(BaseKey, MaxItems) ->
 
 put(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key, Val) ->
     I = Key - BaseKey,
-    NewData = array:set(I, Val, Data),
+    NewData = try array:set(I, Val, Data)
+              catch error:badarg ->
+                        lager:error("Error adding entry to index, base key ~p, i ~p, key ~p, val ~p",
+                                    [BaseKey, I, Key, Val]),
+                        error(badarg)
+              end,
     Idx#sblob_idx{data=NewData}.
 
 closest_loop(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->

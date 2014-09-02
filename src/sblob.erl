@@ -11,7 +11,7 @@ open(Path, Name, Opts) ->
     FullPath = filename:join([AbsPath, Name]),
 
     #sblob_cfg{base_seqnum=BaseSeqNum, max_items=MaxItems} = Config,
-    Index = sblob_idx:new(BaseSeqNum, MaxItems),
+    Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
 
     ok = filelib:ensure_dir(FullPath),
     Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config,
