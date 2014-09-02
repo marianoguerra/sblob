@@ -65,7 +65,11 @@ get_current(Gblob) ->
 
 get_current(#gblob{current=nil, path=Path}=Gblob, BaseSeqNum) ->
     ok = filelib:ensure_dir(filename:join([Path, "sblob"])),
-    Sblob = sblob:open(Path, "sblob", [{base_seqnum, BaseSeqNum}]),
+    ActualSeqNum = if
+                       BaseSeqNum == -1 -> 0;
+                       true -> BaseSeqNum
+                   end,
+    Sblob = sblob:open(Path, "sblob", [{base_seqnum, ActualSeqNum}]),
     #sblob{size=SblobSize} = Sblob,
 
     Sblob1 = if
