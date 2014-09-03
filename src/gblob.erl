@@ -9,7 +9,8 @@
 open(Path, Opts) ->
     AbsPath = filename:absname(Path),
     Config = gblob_util:parse_config(Opts),
-    #gblob{path=AbsPath, config=Config}.
+    Name = filename:basename(Path),
+    #gblob{path=AbsPath, name=Name, config=Config}.
 
 close(#gblob{current=nil}=Gblob) ->
     Gblob;

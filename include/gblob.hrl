@@ -7,6 +7,8 @@
 -record(gblob, {
           % path to gblob folder
           path,
+          % name of the folder
+          name,
           % current sblob, will be opened only when required
           current=nil,
           index=nil,

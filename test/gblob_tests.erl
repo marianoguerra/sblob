@@ -195,7 +195,7 @@ open_test() ->
     AbsPath = filename:absname(Path),
     Gblob = gblob:open(Path, []),
     Idx = Gblob#gblob.index,
-    ?assertEqual(#gblob{path=AbsPath, index=Idx, config=#gblob_cfg{}}, Gblob).
+    ?assertEqual(#gblob{path=AbsPath, index=Idx, name=Path, config=#gblob_cfg{}}, Gblob).
 
 get_blob_indexes_test() ->
     Indexes = gblob_util:get_blob_indexes_from_list(["sblob.5", "sblob.3", "sblob.4", "sblob.10"]),
