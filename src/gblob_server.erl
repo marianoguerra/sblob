@@ -1,7 +1,7 @@
 -module(gblob_server).
 -behaviour(gen_server).
 
--export([start/2, stop/1, state/1, put/2, get/2, get/3]).
+-export([start/2, stop/1, state/1, put/2, put/3, get/2, get/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% Public API
@@ -14,6 +14,9 @@ stop(Module) ->
 
 put(Pid, Data) ->
     gen_server:call(Pid, {put, Data}).
+
+put(Pid, Timestamp, Data) ->
+    gen_server:call(Pid, {put, Timestamp, Data}).
 
 get(Pid, SeqNum) ->
     gen_server:call(Pid, {get, SeqNum}).
@@ -39,6 +42,10 @@ handle_call(state, _From, Gblob) ->
 
 handle_call({put, Data}, _From, Gblob) ->
     {NewGblob, Entity} = gblob:put(Gblob, Data),
+    {reply, Entity, NewGblob};
+
+handle_call({put, Timestamp, Data}, _From, Gblob) ->
+    {NewGblob, Entity} = gblob:put(Gblob, Timestamp, Data),
     {reply, Entity, NewGblob};
 
 handle_call({get, SeqNum}, _From, Gblob) ->

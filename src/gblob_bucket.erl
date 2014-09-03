@@ -1,7 +1,7 @@
 -module(gblob_bucket).
 -behaviour(gen_server).
 
--export([start/3, stop/1, state/1, put/3, get/3, get/4]).
+-export([start/3, stop/1, state/1, put/3, put/4, get/3, get/4]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -record(state, {gblobs, gblob_opts, bucket_opts, path}).
@@ -17,6 +17,9 @@ stop(Module) ->
 
 put(Pid, Id, Data) when is_binary(Id) ->
     gen_server:call(Pid, {put, Id, Data}).
+
+put(Pid, Id, Timestamp, Data) when is_binary(Id) ->
+    gen_server:call(Pid, {put, Id, Timestamp, Data}).
 
 get(Pid, Id, SeqNum) when is_binary(Id) ->
     gen_server:call(Pid, {get, Id, SeqNum}).
@@ -49,6 +52,9 @@ handle_call(state, _From, State) ->
 
 handle_call({put, Id, Data}, _From, State) ->
     with_gblob(State, Id, fun(Gblob) -> gblob_server:put(Gblob, Data) end);
+
+handle_call({put, Id, Timestamp, Data}, _From, State) ->
+    with_gblob(State, Id, fun(Gblob) -> gblob_server:put(Gblob, Timestamp, Data) end);
 
 handle_call({get, Id, SeqNum}, _From, State) ->
     with_gblob(State, Id, fun(Gblob) -> gblob_server:get(Gblob, SeqNum) end);
