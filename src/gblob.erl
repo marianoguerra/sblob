@@ -12,7 +12,7 @@ open(Path, Opts) when is_binary(Path) ->
 open(Path, Opts) ->
     AbsPath = filename:absname(Path),
     Config = gblob_util:parse_config(Opts),
-    Name = filename:basename(Path),
+    Name = list_to_binary(filename:basename(Path)),
     #gblob{path=AbsPath, name=Name, config=Config}.
 
 close(#gblob{current=nil}=Gblob) ->
