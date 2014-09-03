@@ -1,5 +1,5 @@
 -module(sblob_util).
--export([parse_config/1, now/0,
+-export([parse_config/1, now/0, remove_recursive/1,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1,
          handle_get_one/1, seqread/5, fold/5,
@@ -265,3 +265,20 @@ fold(Path, ChunkName, Opts, Fun, Acc0) ->
     SblobPath = filename:join([Path, ChunkName]),
     Handle = open_file(SblobPath, ReadAhead),
     do_fold(Handle, Fun, Acc0).
+
+% sub_file and remove_recursive adapted from 
+% https://github.com/erlware/erlware_commons/blob/master/src/ec_file.erl
+sub_files(From) ->
+    {ok, SubFiles} = file:list_dir(From),
+    [filename:join(From, SubFile) || SubFile <- SubFiles].
+
+remove_recursive(Path) ->
+    case filelib:is_dir(Path) of
+        false ->
+            file:delete(Path);
+        true ->
+            lists:foreach(fun(ChildPath) ->
+                                  remove_recursive(ChildPath)
+                          end, sub_files(Path)),
+            file:del_dir(Path)
+    end.
