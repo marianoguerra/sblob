@@ -10,6 +10,6 @@
           % current sblob, will be opened only when required
           current=nil,
           index=nil,
-          min_chunk_num=0,
-          max_chunk_num=0,
+          min_chunk_num=nil,
+          max_chunk_num=nil,
           config=#gblob_cfg{}}).

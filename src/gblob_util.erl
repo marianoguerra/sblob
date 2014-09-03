@@ -202,6 +202,12 @@ do_fold(Fun, AccIn, [H|T]) ->
 % Res = {stop, AccOut} | {continue, AccOut}
 % it will return a tagged tuple with one of {stop, AccEnd} | {eof, AccEnd}
 % depending on how it stopped processing
+fold(Gblob=#gblob{path=Path, min_chunk_num=nil, max_chunk_num=nil},
+     Opts, Fun, Acc0) ->
+    {MinChunkNum, MaxChunkNum} = gblob_util:get_blob_index_limits(Path),
+    fold(Gblob#gblob{min_chunk_num=MinChunkNum, max_chunk_num=MaxChunkNum},
+         Opts, Fun, Acc0);
+
 fold(#gblob{path=Path, min_chunk_num=MinChunkNum, max_chunk_num=MaxChunkNum},
      Opts, Fun, Acc0) ->
 
