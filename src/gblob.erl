@@ -20,7 +20,8 @@ close(#gblob{current=Sblob}=Gblob) ->
 
 delete(#gblob{path=Path}=Gblob) ->
     NewGblob = close(Gblob),
-    ok = sblob_util:remove(Path),
+    % XXX: log remove result? (not for enoent)
+    sblob_util:remove(Path),
     NewGblob.
 
 put(Gblob, Data) ->

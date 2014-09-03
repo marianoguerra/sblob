@@ -36,7 +36,8 @@ close(#sblob{handle=Handle}=Sblob) ->
 delete(#sblob{fullpath=FullPath}=Sblob) ->
     lager:debug("delete ~p", [lager:pr(Sblob, ?MODULE)]),
     NewSblob = close(Sblob),
-    ok = sblob_util:remove(FullPath),
+    % XXX: log remove result?
+    sblob_util:remove(FullPath),
     NewSblob.
 
 put(Sblob, Data) ->

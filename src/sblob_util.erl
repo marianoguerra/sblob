@@ -1,7 +1,7 @@
 -module(sblob_util).
--export([parse_config/1, now/0, remove_recursive/1,
+-export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
-         clear_data/1, read/2, remove/1,
+         clear_data/1, read/2, remove/1, mark_removed/1,
          handle_get_one/1, seqread/5, fold/5,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
@@ -111,8 +111,7 @@ blob_size(EntryDataLen) ->
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
     EntryDataLen + LenSize + HeaderSize.
 
-remove(Path) ->
-    % TODO: delete instead of move
+mark_removed(Path) ->
     NowStr = integer_to_list(sblob_util:now()),
     case file:rename(Path, Path ++ "." ++ NowStr ++ ".removed") of
         ok -> ok;
@@ -272,13 +271,13 @@ sub_files(From) ->
     {ok, SubFiles} = file:list_dir(From),
     [filename:join(From, SubFile) || SubFile <- SubFiles].
 
-remove_recursive(Path) ->
+remove(Path) ->
     case filelib:is_dir(Path) of
         false ->
             file:delete(Path);
         true ->
             lists:foreach(fun(ChildPath) ->
-                                  remove_recursive(ChildPath)
+                                  remove(ChildPath)
                           end, sub_files(Path)),
             file:del_dir(Path)
     end.
