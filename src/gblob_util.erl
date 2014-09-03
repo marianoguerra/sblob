@@ -177,6 +177,7 @@ seqread(#gblob{index=Idx}=Gblob, SeqNum, Count) ->
     end,
 
     ReadAhead = get_read_ahead_config(Gblob1),
-    {Gblob2, NestedResult} = seqread(Gblob1, BaseChunk, SeqNum, Count, ReadAhead, []),
+    Opts = [{read_ahead, ReadAhead}],
+    {Gblob2, NestedResult} = seqread(Gblob1, BaseChunk, SeqNum, Count, Opts, []),
     Result = lists:flatten(NestedResult),
     {Gblob2, Result}.

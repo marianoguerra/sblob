@@ -227,9 +227,10 @@ seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, nil, _, Count, 
 seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, FirstSeqNum, _, Count, MaxCount, MinSeqNum}) ->
     {continue, {[Entry|Items], FirstSeqNum, EntrySeqNum, Count + 1, MaxCount, MinSeqNum}}.
 
-seqread(Path, ChunkName, SeqNum, Count, ReadAhead) ->
+seqread(Path, ChunkName, SeqNum, Count, Opts) ->
     lager:debug("seqread ~s ~p ~p", [ChunkName, SeqNum, Count]),
     SblobPath = filename:join([Path, ChunkName]),
+    ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
     Handle = open_file(SblobPath, ReadAhead),
     FoldFun = fun seqread_fold_fun/2,
     AccOut  = do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}),
@@ -255,7 +256,8 @@ do_fold(Handle, Fun, Acc0) ->
 % if it should continue or stop
 % Fun = fun((Elem :: T, AccIn) -> Res)
 % Res = {stop, AccOut} | {continue, AccOut}
-fold(Path, ChunkName, ReadAhead, Fun, Acc0) ->
+fold(Path, ChunkName, Opts, Fun, Acc0) ->
+    ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
     SblobPath = filename:join([Path, ChunkName]),
     Handle = open_file(SblobPath, ReadAhead),
     do_fold(Handle, Fun, Acc0).
