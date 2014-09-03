@@ -2,7 +2,7 @@
 -export([parse_config/1, now/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1,
-         handle_get_one/1, seqread/5,
+         handle_get_one/1, seqread/5, fold/5,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
@@ -208,33 +208,54 @@ handle_get_one(Result) ->
         {First, [Entry]} -> {First, Entry}
     end.
 
-seqread_raw(Handle, _SeqNum, FirstSeqNum, LastSeqNum, 0, Count, Accum) ->
-    file:close(Handle),
-    Result = lists:reverse(Accum),
-    {Result, FirstSeqNum, LastSeqNum, Count};
-
-seqread_raw(Handle, SeqNum, FirstSeqNum, LastSeqNum, Remaining, Count, Accum) ->
-    case raw_get_next(Handle) of
-        eof ->
-            seqread_raw(Handle, SeqNum, FirstSeqNum, LastSeqNum, 0, Count, Accum);
-        (#sblob_entry{seqnum=EntrySeqNum}=Entry) ->
-            NewFirstSeqNum = if
-                                 FirstSeqNum =:= nil -> EntrySeqNum;
-                                 true -> FirstSeqNum
-                             end,
-            if
-                EntrySeqNum >= SeqNum ->
-                    seqread_raw(Handle, SeqNum, NewFirstSeqNum, EntrySeqNum,
-                                Remaining - 1, Count + 1, [Entry|Accum]);
-                true ->
-                    seqread_raw(Handle, SeqNum, NewFirstSeqNum, EntrySeqNum,
-                                Remaining, Count, Accum)
-            end
-    end.
+% stop if more than count
+seqread_fold_fun(_, {_, _, _, Count, MaxCount, _}=Accum)
+  when Count >= MaxCount ->
+    {stop, Accum};
+% ignore if seqnum is < min seqnum but set first seqnum if not set
+seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}, {Items, nil, _, Count, MaxCount, MinSeqNum})
+  when EntrySeqNum < MinSeqNum ->
+    {continue, {Items, EntrySeqNum, EntrySeqNum, Count, MaxCount, MinSeqNum}};
+% ignore if seqnum is < min seqnum
+seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}, {Items, FirstSeqNum, _, Count, MaxCount, MinSeqNum})
+  when EntrySeqNum < MinSeqNum ->
+    {continue, {Items, FirstSeqNum, EntrySeqNum, Count, MaxCount, MinSeqNum}};
+% collect and set first seqnum if not set
+seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, nil, _, Count, MaxCount, MinSeqNum}) ->
+    {continue, {[Entry|Items], EntrySeqNum, EntrySeqNum, Count + 1, MaxCount, MinSeqNum}};
+% otherwise just collect
+seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, FirstSeqNum, _, Count, MaxCount, MinSeqNum}) ->
+    {continue, {[Entry|Items], FirstSeqNum, EntrySeqNum, Count + 1, MaxCount, MinSeqNum}}.
 
 seqread(Path, ChunkName, SeqNum, Count, ReadAhead) ->
     lager:debug("seqread ~s ~p ~p", [ChunkName, SeqNum, Count]),
     SblobPath = filename:join([Path, ChunkName]),
     Handle = open_file(SblobPath, ReadAhead),
-    seqread_raw(Handle, SeqNum, nil, nil, Count, 0, []).
+    FoldFun = fun seqread_fold_fun/2,
+    AccOut  = do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}),
+    {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
+    {lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount}.
 
+do_fold(Handle, Fun, Acc0) ->
+    case raw_get_next(Handle) of
+        eof ->
+            file:close(Handle),
+            Acc0;
+
+        Entry ->
+            case Fun(Entry, Acc0) of
+                {continue, Acc1} -> do_fold(Handle, Fun, Acc1);
+                {stop, AccEnd} -> 
+                    file:close(Handle),
+                    AccEnd
+            end
+    end.
+
+% like lists:foldl but the result of Fun is a tagged tuple that indicates
+% if it should continue or stop
+% Fun = fun((Elem :: T, AccIn) -> Res)
+% Res = {stop, AccOut} | {continue, AccOut}
+fold(Path, ChunkName, ReadAhead, Fun, Acc0) ->
+    SblobPath = filename:join([Path, ChunkName]),
+    Handle = open_file(SblobPath, ReadAhead),
+    do_fold(Handle, Fun, Acc0).
