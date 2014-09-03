@@ -123,11 +123,11 @@ get_read_ahead_config(#gblob{current=nil}) -> ?SBLOB_DEFAULT_READ_AHEAD;
 get_read_ahead_config(#sblob_cfg{read_ahead=ReadAhead}) -> ReadAhead;
 get_read_ahead_config(#sblob{config=Config}) ->
     get_read_ahead_config(Config);
-get_read_ahead_config(#gblob{current=Sblob}) -> 
+get_read_ahead_config(#gblob{current=Sblob}) ->
     get_read_ahead_config(Sblob).
 
 get_index(#gblob{index=nil, path=Path}=Gblob) ->
-    {FirstIdx, LastIdx} = gblob_util:get_blob_index_limits(Path),
+    {FirstIdx, LastIdx} = get_blob_index_limits(Path),
     BaseFileNum = FirstIdx,
     IndexSize = LastIdx - FirstIdx + 1,
     Index = sblob_idx:new(BaseFileNum, IndexSize),
@@ -204,7 +204,7 @@ do_fold(Fun, AccIn, [H|T]) ->
 % depending on how it stopped processing
 fold(Gblob=#gblob{path=Path, min_chunk_num=nil, max_chunk_num=nil},
      Opts, Fun, Acc0) ->
-    {MinChunkNum, MaxChunkNum} = gblob_util:get_blob_index_limits(Path),
+    {MinChunkNum, MaxChunkNum} = get_blob_index_limits(Path),
     fold(Gblob#gblob{min_chunk_num=MinChunkNum, max_chunk_num=MaxChunkNum},
          Opts, Fun, Acc0);
 
