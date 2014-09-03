@@ -5,6 +5,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("sblob.hrl").
 
+open(Path, Name, Opts) when is_binary(Path) ->
+    open(binary_to_list(Path), Name, Opts);
+
+open(Path, Name, Opts) when is_binary(Name) ->
+    open(Path, binary_to_list(Name), Opts);
+
 open(Path, Name, Opts) ->
     Config = sblob_util:parse_config(Opts),
     AbsPath = filename:absname(Path),

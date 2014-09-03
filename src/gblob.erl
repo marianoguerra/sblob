@@ -6,6 +6,9 @@
 -include("gblob.hrl").
 -include("sblob.hrl").
 
+open(Path, Opts) when is_binary(Path) ->
+    open(binary_to_list(Path), Opts);
+
 open(Path, Opts) ->
     AbsPath = filename:absname(Path),
     Config = gblob_util:parse_config(Opts),
