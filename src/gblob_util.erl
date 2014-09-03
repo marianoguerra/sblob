@@ -31,6 +31,10 @@ parse_config([{max_size_bytes, Val}|T], Config) ->
 parse_config([], Config) ->
     Config.
 
+% nil represents the current chunk
+chunk_name(nil) ->
+    "sblob";
+
 chunk_name(ChunkNum) ->
     ChunkNumStr = integer_to_list(ChunkNum),
     "sblob." ++ ChunkNumStr.
@@ -211,7 +215,8 @@ fold(Gblob=#gblob{path=Path, min_chunk_num=nil, max_chunk_num=nil},
 fold(#gblob{path=Path, min_chunk_num=MinChunkNum, max_chunk_num=MaxChunkNum},
      Opts, Fun, Acc0) ->
 
-    Nums = lists:seq(MinChunkNum, MaxChunkNum),
+    % add nil so the current chunk is also folded
+    Nums = lists:seq(MinChunkNum, MaxChunkNum) ++ [nil],
     do_fold(fun (ChunkNum, AccIn) ->
                     ChunkName = chunk_name(ChunkNum),
                     sblob_util:fold(Path, ChunkName, Opts, Fun, AccIn)
