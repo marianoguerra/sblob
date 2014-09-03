@@ -18,6 +18,8 @@ usage_test_() ->
       fun write_100_read_last_50/1,
       fun write_100_read_some_50/1,
       fun write_100_read_some/1,
+      fun write_40_fold_40/1,
+      fun write_40_fold_first_20/1,
       fun write_4_in_two_parts_read_all/1,
       fun write_100_in_two_parts_read_all/1,
       fun write_rotate_reopen_write/1,
@@ -129,6 +131,27 @@ write_100_read_some(Gblob) ->
                       {Tests, GblobOut}
               end, Gblob1, lists:seq(1, 10)),
     Tests.
+
+write_40_fold_40(Gblob) ->
+    Gblob1 = write_many(Gblob, 40),
+    Opts = [],
+    {Reason, Items} = gblob_util:fold(Gblob1, Opts, fun (Entry, Entries) -> 
+                                          {continue, [Entry|Entries]}
+                                  end, []),
+    [?_assertEqual(eof, Reason),
+     ?_assertEqual(40, length(Items))].
+
+write_40_fold_first_20(Gblob) ->
+    Gblob1 = write_many(Gblob, 40),
+    Opts = [],
+    Fun = fun (Entry, {Count, Entries}) -> 
+                  if Count < 20 -> {continue, {Count + 1, [Entry|Entries]}};
+                     true -> {stop, Entries}
+                  end
+          end,
+    {Reason, Items} = gblob_util:fold(Gblob1, Opts, Fun, {0, []}),
+    [?_assertEqual(stop, Reason),
+     ?_assertEqual(20, length(Items))].
 
 assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
     [?_assertEqual(EData, Data),

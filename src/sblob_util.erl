@@ -233,7 +233,7 @@ seqread(Path, ChunkName, SeqNum, Count, Opts) ->
     ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
     Handle = open_file(SblobPath, ReadAhead),
     FoldFun = fun seqread_fold_fun/2,
-    AccOut  = do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}),
+    {_, AccOut}  = do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}),
     {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
     {lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount}.
 
@@ -241,14 +241,16 @@ do_fold(Handle, Fun, Acc0) ->
     case raw_get_next(Handle) of
         eof ->
             file:close(Handle),
-            Acc0;
+            {eof, Acc0};
 
         Entry ->
             case Fun(Entry, Acc0) of
-                {continue, Acc1} -> do_fold(Handle, Fun, Acc1);
-                {stop, AccEnd} -> 
+                {continue, Acc1} ->
+                    do_fold(Handle, Fun, Acc1);
+
+                {stop, _AccEnd}=Res -> 
                     file:close(Handle),
-                    AccEnd
+                    Res
             end
     end.
 
@@ -256,6 +258,8 @@ do_fold(Handle, Fun, Acc0) ->
 % if it should continue or stop
 % Fun = fun((Elem :: T, AccIn) -> Res)
 % Res = {stop, AccOut} | {continue, AccOut}
+% it will return a tagged tuple with one of {stop, AccEnd} | {eof, AccEnd}
+% depending on how it stopped processing
 fold(Path, ChunkName, Opts, Fun, Acc0) ->
     ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
     SblobPath = filename:join([Path, ChunkName]),

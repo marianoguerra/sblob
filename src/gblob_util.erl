@@ -4,6 +4,7 @@
          should_rotate/1,
          path_for_chunk_num/2,
          seqread/3,
+         fold/4,
          get_index/1,
          get_blob_indexes_from_list/1, get_blob_indexes/1,
          get_blob_index_limits/1]).
@@ -181,3 +182,31 @@ seqread(#gblob{index=Idx}=Gblob, SeqNum, Count) ->
     {Gblob2, NestedResult} = seqread(Gblob1, BaseChunk, SeqNum, Count, Opts, []),
     Result = lists:flatten(NestedResult),
     {Gblob2, Result}.
+
+do_fold(_Fun, AccIn, []) ->
+    AccIn;
+do_fold(Fun, AccIn, [H|T]) ->
+    case Fun(H, AccIn) of
+        {eof, AccOut}=ResEof ->
+            IsLastItem = (length(T) == 0),
+            if IsLastItem -> ResEof;
+               true -> do_fold(Fun, AccOut, T)
+            end;
+        {stop, _}=ResStop ->
+            ResStop
+    end.
+
+% like lists:foldl but the result of Fun is a tagged tuple that indicates
+% if it should continue or stop
+% Fun = fun((Elem :: T, AccIn) -> Res)
+% Res = {stop, AccOut} | {continue, AccOut}
+% it will return a tagged tuple with one of {stop, AccEnd} | {eof, AccEnd}
+% depending on how it stopped processing
+fold(#gblob{path=Path, min_chunk_num=MinChunkNum, max_chunk_num=MaxChunkNum},
+     Opts, Fun, Acc0) ->
+
+    Nums = lists:seq(MinChunkNum, MaxChunkNum),
+    do_fold(fun (ChunkNum, AccIn) ->
+                    ChunkName = chunk_name(ChunkNum),
+                    sblob_util:fold(Path, ChunkName, Opts, Fun, AccIn)
+            end, Acc0, Nums).
