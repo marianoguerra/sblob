@@ -19,10 +19,20 @@ usage_test_() ->
       fun write_100_read_some/1
      ]}.
 
-usage_start() ->
+new_gblob_server(ServerOpts) ->
     Path = io_lib:format("gblob-~p", [sblob_util:now()]),
-    {ok, Gblob} = gblob_server:start(Path, [{max_items, 10}]),
+    {ok, Gblob} = gblob_server:start(Path, [{max_items, 10}], ServerOpts),
     Gblob.
+
+cleanup_on_inactivity_test() ->
+    Server = new_gblob_server([{check_interval_ms, 1}]),
+    timer:sleep(500),
+    {Active, LastActivity} = gblob_server:status(Server),
+    ?assertEqual(false, Active),
+    ?assertEqual(true, LastActivity > 0).
+
+usage_start() ->
+    new_gblob_server([]).
 
 usage_stop(Gblob) ->
     gblob_server:stop(Gblob).

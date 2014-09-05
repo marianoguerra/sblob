@@ -1,5 +1,5 @@
 -module(sblob_util).
--export([parse_config/1, now/0,
+-export([parse_config/1, now/0, now_fast/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
          handle_get_one/1, seqread/5, fold/5,
@@ -11,6 +11,12 @@
 
 now() ->
     {Mega, Sec, Micro} = erlang:now(),
+    (Mega * 1000000 + Sec) * 1000000 + Micro.
+
+% If you do not need the return value to be unique and monotonically
+% increasing, use os:timestamp/0 instead to avoid some overhead.
+now_fast() ->
+    {Mega, Sec, Micro} = os:timestamp(),
     (Mega * 1000000 + Sec) * 1000000 + Micro.
 
 parse_config(Opts) ->
