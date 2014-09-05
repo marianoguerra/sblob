@@ -38,13 +38,13 @@ status(Pid) ->
 init([Path, Opts, ServerOpts]) ->
     CheckIntervalMs = proplists:get_value(check_interval_ms, ServerOpts, 30000),
     Gblob = gblob:open(Path, Opts),
-    BaseState = #state{active=true, check_interval_ms=CheckIntervalMs},
+    BaseState = #state{check_interval_ms=CheckIntervalMs},
     State = update_gblob(BaseState, Gblob),
     {ok, State, State#state.check_interval_ms}.
 
 handle_call(stop, _From, State=#state{gblob=Gblob}) ->
     NewGblob = gblob:close(Gblob),
-    NewState = update_gblob(State, NewGblob),
+    NewState = update_gblob(State, NewGblob, false),
     {stop, normal, stopped, NewState};
 
 handle_call(status, _From, State=#state{active=Active, last_action=LastAction}) ->
@@ -103,4 +103,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% Private api
 
 update_gblob(State, NewGblob) ->
-    State#state{gblob=NewGblob, last_action=sblob_util:now_fast()}.
+    update_gblob(State, NewGblob, true).
+
+update_gblob(State, NewGblob, Active) ->
+    State#state{gblob=NewGblob, last_action=sblob_util:now_fast(), active=Active}.
