@@ -8,7 +8,7 @@
 -record(state, {gblob,
                 last_action=0,
                 last_check=0,
-                last_eviction_check=0,
+                last_eviction=0,
                 active,
                 max_interval_no_eviction_ms = 60000,
                 check_interval_ms=30000}).
@@ -57,7 +57,7 @@ handle_call(stop, _From, State=#state{gblob=Gblob}) ->
 
 handle_call(status, _From, State=#state{active=Active,
                                         last_action=LastAction,
-                                        last_eviction_check=LastEviction}) ->
+                                        last_eviction=LastEviction}) ->
     {reply, {Active, LastAction, LastEviction}, State};
 
 handle_call({put, Data}, _From, State=#state{gblob=Gblob}) ->
@@ -106,20 +106,27 @@ update_gblob(State, NewGblob) ->
 update_gblob(State, NewGblob, Active) ->
     State#state{gblob=NewGblob, last_action=sblob_util:now_fast(), active=Active}.
 
-check_eviction(Gblob=#gblob{path=Path}, State=#state{last_eviction_check=LastCheck,
-                                   max_interval_no_eviction_ms=MaxIntervalNoEvictionMs}) ->
-    Now = sblob_util:now_fast(),
-    LastCheckTime = Now - MaxIntervalNoEvictionMs,
-    ShouldEvict = LastCheck /= 0 andalso LastCheck < LastCheckTime,
+check_eviction(Gblob=#gblob{path=Path},
+               State=#state{last_eviction=LastEviction,
+                            max_interval_no_eviction_ms=MaxIntervalNoEvictionMs}) ->
 
-    NewState = State#state{last_eviction_check=Now},
+    Now = sblob_util:now_fast(),
+    LastEvictionTime = Now - MaxIntervalNoEvictionMs,
+    % if last_eviction is 0 ignore and set to something small so next time it
+    % runs
+    ShouldEvict = (LastEviction /= 0) andalso (LastEviction < LastEvictionTime),
+    NewEvictionTime = if
+                          LastEviction == 0 -> 1;
+                          true -> LastEviction
+                      end,
 
     if
         ShouldEvict ->
-            lager:info("max interval with no eviction, calling ~s", [Path]),
+            lager:info("max interval with no eviction, calling ~s ~p < ~p",
+                       [Path, LastEviction, LastEvictionTime]),
             NewGblob = do_eviction(Gblob),
-            NewState#state{gblob=NewGblob};
-        true -> NewState
+            State#state{gblob=NewGblob, last_eviction=Now};
+        true -> State#state{last_eviction=NewEvictionTime}
     end.
 
 
@@ -151,5 +158,6 @@ do_check(State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=Che
 
     MaybeEvictedGblob = do_eviction(NewGblob),
 
+    % set last_eviction to 0 so check_eviction doesn't run next time
     State#state{active=NewActive, gblob=MaybeEvictedGblob, last_check=Now,
-               last_eviction_check=Now}.
+                last_eviction=0}.
