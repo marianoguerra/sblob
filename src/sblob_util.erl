@@ -14,13 +14,13 @@
 
 now() ->
     {Mega, Sec, Micro} = erlang:now(),
-    (Mega * 1000000 + Sec) * 1000000 + Micro.
+    ((Mega * 1000000 + Sec) * 1000000 + Micro) div 1000.
 
 % If you do not need the return value to be unique and monotonically
 % increasing, use os:timestamp/0 instead to avoid some overhead.
 now_fast() ->
     {Mega, Sec, Micro} = os:timestamp(),
-    (Mega * 1000000 + Sec) * 1000000 + Micro.
+    ((Mega * 1000000 + Sec) * 1000000 + Micro) div 1000.
 
 parse_config(Opts) ->
     parse_config(Opts, #sblob_cfg{}).
