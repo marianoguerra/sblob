@@ -87,6 +87,9 @@ handle_info(timeout, State=#state{active=false}) ->
 handle_info(timeout, State) ->
     {noreply, do_check(State)};
 
+handle_info(check_eviction, State=#state{gblob=Gblob}) ->
+    {noreply, check_eviction(Gblob, State)};
+
 handle_info(Msg, State) ->
     io:format("Unexpected handle info message: ~p~n",[Msg]),
     {noreply, State}.
@@ -132,8 +135,8 @@ check_eviction(Gblob=#gblob{path=Path},
 
 server_put(Gblob, Timestamp, Data, State) ->
     {Gblob1, Entity} = gblob:put(Gblob, Timestamp, Data),
-    State1 = update_gblob(State, Gblob1),
-    NewState = check_eviction(Gblob1, State1),
+    NewState = update_gblob(State, Gblob1),
+    timer:send_after(1, check_eviction),
     {reply, Entity, NewState, NewState#state.check_interval_ms}.
 
 do_eviction(Gblob=#gblob{path=Path}) ->
