@@ -119,7 +119,7 @@ check_eviction(Gblob=#gblob{path=Path},
     % runs
     ShouldEvict = (LastEviction /= 0) andalso (LastEviction < LastEvictionTime),
     NewEvictionTime = if
-                          LastEviction == 0 -> 1;
+                          LastEviction == 0 -> Now;
                           true -> LastEviction
                       end,
 
