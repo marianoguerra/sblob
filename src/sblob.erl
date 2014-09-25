@@ -16,12 +16,8 @@ open(Path, Name, Opts) ->
     AbsPath = filename:absname(Path),
     FullPath = filename:join([AbsPath, Name]),
 
-    #sblob_cfg{base_seqnum=BaseSeqNum, max_items=MaxItems} = Config,
-    Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
-
     ok = filelib:ensure_dir(FullPath),
-    Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config,
-           index=Index},
+    Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config},
 
     Result = sblob_util:fill_bounds(Sblob),
     lager:debug("open ~p", [lager:pr(Result, ?MODULE)]),

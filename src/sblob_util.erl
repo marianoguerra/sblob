@@ -74,18 +74,24 @@ seek_to_seqnum(Sblob, SeqNum) ->
     {OffsetKey, NewSblob#sblob{position=NewPos}}.
 
 fill_bounds(#sblob{name=Name}=Sblob) ->
-    {Sblob1, Last} = get_first(Sblob),
+    {Sblob1, First} = get_first(Sblob),
     Cfg = Sblob1#sblob.config,
     CfgBaseSeqNum = Cfg#sblob_cfg.base_seqnum,
-    case Last of
+    MaxItems = Cfg#sblob_cfg.max_items,
+    case First of
         notfound -> 
             lager:debug("fill bounds, empty ~s", [Name]),
-            Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum, size=0};
-        #sblob_entry{seqnum=FirstSeqNum} ->
-            {Sblob2, #sblob_entry{seqnum=LastSeqNum}} = get_last(Sblob1),
+            Index = sblob_idx:new(CfgBaseSeqNum + 1, MaxItems),
+            Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum,
+                         size=0, index=Index};
+        #sblob_entry{seqnum=FirstSeqNum, offset=FirstOffset} ->
+            {Sblob2, #sblob_entry{seqnum=LastSeqNum, offset=LastOffset}} = get_last(Sblob1),
             BaseSeqNum = FirstSeqNum  - 1,
             lager:debug("fill bounds ~s ~p - ~p", [Name, BaseSeqNum, LastSeqNum]),
-            Sblob2#sblob{base_seqnum=BaseSeqNum, seqnum=LastSeqNum}
+            Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
+            Index1 = sblob_idx:put(Index, FirstSeqNum, FirstOffset),
+            Index2 = sblob_idx:put(Index1, LastSeqNum, LastOffset),
+            Sblob2#sblob{base_seqnum=BaseSeqNum, seqnum=LastSeqNum, index=Index2}
     end.
 
 read(#sblob{handle=nil}=Sblob, Len) ->
@@ -160,7 +166,12 @@ get_next(Sblob) ->
                                     size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
 
     BlobSeqNum = Entry#sblob_entry.seqnum,
-    NewIndex = sblob_idx:put(Sblob2#sblob.index, BlobSeqNum, EntryOffset),
+    Index = Sblob2#sblob.index,
+    NewIndex = if
+        Index == nil -> Index;
+        true ->
+            sblob_idx:put(Index, BlobSeqNum, EntryOffset)
+    end,
     Sblob3 = Sblob2#sblob{index=NewIndex},
 
     {Sblob3, Entry}.

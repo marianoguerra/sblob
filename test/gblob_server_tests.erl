@@ -29,7 +29,7 @@ cleanup_on_inactivity_test() ->
     timer:sleep(500),
     {Active, LastActivity, LastEviction} = gblob_server:status(Server),
     ?assertEqual(false, Active),
-    ?assertEqual(true, LastEviction > 0),
+    ?assertEqual(true, LastEviction == 0),
     ?assertEqual(true, LastActivity > 0).
 
 force_evict_on_inactivity_test() ->
