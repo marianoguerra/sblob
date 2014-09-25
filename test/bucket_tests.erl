@@ -29,7 +29,6 @@ put_1_read_1(Bucket) ->
     WEntry = gblob_bucket:put(Bucket, <<"s1">>, <<"hi!">>),
     REntry = gblob_bucket:get(Bucket, <<"s1">>, 1),
     [?_assertEqual(REntry, WEntry)].
-    
 
 put_on_2_buckets_read_back_each(Bucket) ->
     WEntry1 = gblob_bucket:put(Bucket, <<"s1">>, <<"hi!">>),

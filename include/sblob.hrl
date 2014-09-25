@@ -56,6 +56,8 @@
           size
 }).
 
+-record(sblob_info, {path, size, name, index, mtime}).
+
 -define(SBLOB_HEADER_SIZE_BYTES, 20).
 -define(SBLOB_HEADER_LEN_SIZE_BITS, 32).
 -define(SBLOB_HEADER_LEN_SIZE_BYTES, 4).

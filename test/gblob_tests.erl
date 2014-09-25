@@ -20,6 +20,7 @@ usage_test_() ->
       fun write_100_read_some/1,
       fun write_42_fold_42/1,
       fun write_42_fold_first_20/1,
+      fun write_42_get_stats/1,
       fun write_4_in_two_parts_read_all/1,
       fun write_100_in_two_parts_read_all/1,
       fun write_rotate_reopen_write/1,
@@ -152,6 +153,46 @@ write_42_fold_first_20(Gblob) ->
     {Reason, Items} = gblob_util:fold(Gblob1, Opts, Fun, {0, []}),
     [?_assertEqual(stop, Reason),
      ?_assertEqual(20, length(Items))].
+
+check_eviction_size(Path, MaxSizeBytes, ExpectedSize, EToKeep, EToRemove) ->
+    Resp = gblob_util:get_eviction_plan_for_size_limit(Path, MaxSizeBytes),
+    {TotalSize, ToKeep, ToRemove} = Resp,
+
+    ToKeepData = get_stats_data(ToKeep),
+    ToRemoveData = get_stats_data(ToRemove),
+
+    [?_assertEqual(ExpectedSize, TotalSize),
+     ?_assertEqual(EToKeep, ToKeepData),
+     ?_assertEqual(EToRemove, ToRemoveData)].
+
+get_stats_data(Stats) ->
+    lists:map(fun (#sblob_info{index=Index, size=Size, name=Name}) ->
+                      {Index, Size, Name}
+              end, Stats).
+
+write_42_get_stats(Gblob=#gblob{path=Path}) ->
+    _Gblob1 = write_many(Gblob, 42),
+    Stats = gblob_util:get_blobs_info(Path),
+    Data = get_stats_data(Stats),
+    FirstSize = 62,
+    SecondSize = 300,
+    OthersSize = 310,
+    TotalSize = 1292,
+
+    E0 = {0, FirstSize, "sblob"},
+    E1 = {1, SecondSize, "sblob.1"},
+    E2 = {2, OthersSize, "sblob.2"},
+    E3 = {3, OthersSize, "sblob.3"},
+    E4 = {4, OthersSize, "sblob.4"},
+
+    % Test eviction plan here to avoid writting again
+
+    [?_assertEqual(5, length(Stats)),
+     ?_assertEqual([E0, E1, E2, E3, E4], Data),
+     check_eviction_size(Path, 0, TotalSize, [], [E0, E1, E2, E3, E4]),
+     check_eviction_size(Path, FirstSize, TotalSize, [E0], [E1, E2, E3, E4]),
+     check_eviction_size(Path, FirstSize + SecondSize + 150, TotalSize, [E0, E1], [E2, E3, E4]),
+     check_eviction_size(Path, TotalSize, TotalSize, [E0, E1, E2, E3, E4], [])].
 
 assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
     [?_assertEqual(EData, Data),

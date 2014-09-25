@@ -5,11 +5,14 @@
          path_for_chunk_num/2,
          seqread/3,
          fold/4,
+         get_eviction_plan_for_size_limit/2,
+         get_blobs_info/1,
          get_index/1,
          get_blob_indexes_from_list/1, get_blob_indexes/1,
          get_blob_index_limits/1]).
 
 -include_lib("eunit/include/eunit.hrl").
+
 -include("gblob.hrl").
 -include("sblob.hrl").
 
@@ -116,6 +119,41 @@ get_blob_index_limits(Path) ->
 get_blob_indexes(Path) ->
     Files = filelib:wildcard("sblob.*", Path),
     get_blob_indexes_from_list(Files).
+
+get_blob_info_by_index(Index, BasePath) ->
+    Name = "sblob." ++ integer_to_list(Index),
+    sblob_util:get_blob_info(BasePath, Name, Index).
+
+get_blobs_info(BasePath) ->
+    Indexes = get_blob_indexes(BasePath),
+    Fun = fun (Index) -> get_blob_info_by_index(Index, BasePath) end,
+    SblobsWithIndex = lists:map(Fun, Indexes),
+    CurrentStats = sblob_util:get_blob_info(BasePath, "sblob", 0),
+    [CurrentStats|SblobsWithIndex].
+
+partition_by_size(Stats, MaxSizeBytes) ->
+    partition_by_size(Stats, MaxSizeBytes, 0, [], []).
+
+partition_by_size([], _MaxSizeBytes, TotalSize, ToKeep, ToRemove) ->
+    {TotalSize, lists:reverse(ToKeep), lists:reverse(ToRemove)};
+
+partition_by_size([#sblob_info{size=Size}=Stat|T], MaxSizeBytes, CurTotalSize,
+                  ToKeep, ToRemove) ->
+
+    NewCurTotalSize = CurTotalSize + Size,
+    
+    if
+        NewCurTotalSize > MaxSizeBytes ->
+            NewToRemove = [Stat|ToRemove],
+            partition_by_size(T, MaxSizeBytes, NewCurTotalSize, ToKeep, NewToRemove);
+        true ->
+            NewToKeep = [Stat|ToKeep],
+            partition_by_size(T, MaxSizeBytes, NewCurTotalSize, NewToKeep, ToRemove)
+    end.
+
+get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
+    Stats = get_blobs_info(BasePath),
+    partition_by_size(Stats, MaxSizeBytes).
 
 should_rotate(#gblob{current=Sblob, config=Config}) ->
     #sblob_stats{size=SblobSize, count=SblobCount} = sblob:stats(Sblob),

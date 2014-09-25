@@ -2,12 +2,15 @@
 -export([parse_config/1, now/0, now_fast/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
+         get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
          get_next/1, get_first/1, get_last/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
 -include("sblob.hrl").
+
+-include_lib("kernel/include/file.hrl").
 
 now() ->
     {Mega, Sec, Micro} = erlang:now(),
@@ -287,3 +290,10 @@ remove(Path) ->
                           end, sub_files(Path)),
             file:del_dir(Path)
     end.
+
+get_blob_info(BasePath, Name, Index) ->
+    FullPath = filename:join([BasePath, Name]),
+    {ok, FileInfo} = file:read_file_info(FullPath, [{time, posix}]),
+    #file_info{size=Size, mtime=MTime} = FileInfo,
+    #sblob_info{path=FullPath, name=Name, index=Index, size=Size, mtime=MTime}.
+
