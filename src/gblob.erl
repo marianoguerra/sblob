@@ -1,6 +1,6 @@
 -module(gblob).
 
--export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3]).
+-export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3, check_eviction/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include("gblob.hrl").
@@ -94,3 +94,18 @@ get(Gblob, SeqNum, Count) ->
     end,
 
     {Gblob2, Result}.
+
+check_eviction(Gblob=#gblob{path=Path, config=Config, name=Name}) ->
+    % leave half the max size so we don't evict too often
+    MaxSizeBytes = Config#gblob_cfg.max_size_bytes * 0.5,
+    Plan = gblob_util:get_eviction_plan_for_size_limit(Path, MaxSizeBytes),
+    Result = gblob_util:run_eviction_plan(Plan),
+    {RemSize, _, _} = Result,
+    NewGblob = if
+                   RemSize > 0 ->
+                       _Gblob1 = close(Gblob),
+                       #gblob{path=Path, name=Name, config=Config};
+                   true -> Gblob
+               end,
+    {NewGblob, Result}.
+

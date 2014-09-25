@@ -293,7 +293,11 @@ remove(Path) ->
 
 get_blob_info(BasePath, Name, Index) ->
     FullPath = filename:join([BasePath, Name]),
-    {ok, FileInfo} = file:read_file_info(FullPath, [{time, posix}]),
-    #file_info{size=Size, mtime=MTime} = FileInfo,
-    #sblob_info{path=FullPath, name=Name, index=Index, size=Size, mtime=MTime}.
+    case file:read_file_info(FullPath, [{time, posix}]) of
+        {ok, FileInfo} ->
+            #file_info{size=Size, mtime=MTime} = FileInfo,
+            #sblob_info{path=FullPath, name=Name, index=Index, size=Size, mtime=MTime};
+        {error, enoent} ->
+            #sblob_info{path=FullPath, name=Name, index=Index, size=0, mtime=0}
+    end.
 

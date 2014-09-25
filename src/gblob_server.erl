@@ -78,16 +78,24 @@ handle_info(timeout, State=#state{active=false}) ->
    {noreply, State};
 
 handle_info(timeout, State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=CheckIntervalMs}) ->
-   lager:info("closing inactive gblob ~s", [Gblob#gblob.path]),
+    Path = Gblob#gblob.path,
 
-   Now = sblob_util:now_fast(),
-   LastCheckTime = Now - CheckIntervalMs,
-   ShouldClose = LastAction < LastCheckTime,
+    Now = sblob_util:now_fast(),
+    LastCheckTime = Now - CheckIntervalMs,
+    ShouldClose = LastAction < LastCheckTime,
 
-   {NewActive, NewGblob} = if ShouldClose -> {false, gblob:close(Gblob)};
-                 true -> {true, Gblob}
-              end,
-   {noreply, State#state{active=NewActive, gblob=NewGblob}};
+    {NewActive, NewGblob} = if
+                                ShouldClose ->
+                                    lager:info("closing inactive gblob ~s", [Path]),
+                                    {false, gblob:close(Gblob)};
+                                true ->
+                                    {true, Gblob}
+                            end,
+
+    {MaybeEvictedGblob, EvictionResult} = gblob:check_eviction(NewGblob),
+    gblob_util:log_eviction_results(Path, EvictionResult),
+
+    {noreply, State#state{active=NewActive, gblob=MaybeEvictedGblob}};
 
 handle_info(Msg, State) ->
     io:format("Unexpected handle info message: ~p~n",[Msg]),

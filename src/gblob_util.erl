@@ -7,6 +7,7 @@
          fold/4,
          get_eviction_plan_for_size_limit/2,
          run_eviction_plan/1,
+         log_eviction_results/2,
          get_blobs_info/1,
          get_index/1,
          get_blob_indexes_from_list/1, get_blob_indexes/1,
@@ -171,6 +172,15 @@ run_eviction_plan({_, _ToKeep, ToRemove}) ->
 
                         {CurSize + Size, Count + 1, NewErrors}
                 end, {0, 0, []}, ToRemove).
+
+log_eviction_error(Error) ->
+    lager:error("eviction error ~p", [Error]).
+
+log_eviction_results(Path, {RemovedSize, RemovedCount, Errors}) ->
+    lager:info("run eviction on ~s, removed ~p blobs (~p bytes) with ~p errors",
+               [Path, RemovedCount, RemovedSize, length(Errors)]),
+    lists:foreach(fun log_eviction_error/1, Errors),
+    ok.
 
 should_rotate(#gblob{current=Sblob, config=Config}) ->
     #sblob_stats{size=SblobSize, count=SblobCount} = sblob:stats(Sblob),

@@ -256,3 +256,9 @@ open_test() ->
 get_blob_indexes_test() ->
     Indexes = gblob_util:get_blob_indexes_from_list(["sblob.5", "sblob.3", "sblob.4", "sblob.10"]),
     ?assertEqual(Indexes, [3, 4, 5, 10]).
+
+run_emply_plan_test() ->
+    {RemSize, RemCount, Errors} = gblob_util:run_eviction_plan({0, [], []}),
+    ?assertEqual(0, RemSize),
+    ?assertEqual(0, RemCount),
+    ?assertEqual([], Errors).
