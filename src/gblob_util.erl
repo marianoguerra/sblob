@@ -6,6 +6,7 @@
          seqread/3,
          fold/4,
          get_eviction_plan_for_size_limit/2,
+         run_eviction_plan/1,
          get_blobs_info/1,
          get_index/1,
          get_blob_indexes_from_list/1, get_blob_indexes/1,
@@ -154,6 +155,22 @@ partition_by_size([#sblob_info{size=Size}=Stat|T], MaxSizeBytes, CurTotalSize,
 get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
     Stats = get_blobs_info(BasePath),
     partition_by_size(Stats, MaxSizeBytes).
+
+evict(Path) ->
+    sblob_util:remove(Path).
+
+% returns {RemovedSize, RemovedCount, Errors}
+run_eviction_plan({_, _ToKeep, ToRemove}) ->
+    lists:foldl(fun (#sblob_info{path=Path, size=Size}, {CurSize, Count, Errors}) ->
+                        NewErrors = try
+                                        evict(Path),
+                                        Errors
+                                    catch
+                                        _:Error -> [Error|Errors]
+                                    end,
+
+                        {CurSize + Size, Count + 1, NewErrors}
+                end, {0, 0, []}, ToRemove).
 
 should_rotate(#gblob{current=Sblob, config=Config}) ->
     #sblob_stats{size=SblobSize, count=SblobCount} = sblob:stats(Sblob),

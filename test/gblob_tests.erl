@@ -136,7 +136,7 @@ write_100_read_some(Gblob) ->
 write_42_fold_42(Gblob) ->
     Gblob1 = write_many(Gblob, 42),
     Opts = [],
-    {Reason, Items} = gblob_util:fold(Gblob1, Opts, fun (Entry, Entries) -> 
+    {Reason, Items} = gblob_util:fold(Gblob1, Opts, fun (Entry, Entries) ->
                                           {continue, [Entry|Entries]}
                                   end, []),
     [?_assertEqual(eof, Reason),
@@ -145,7 +145,7 @@ write_42_fold_42(Gblob) ->
 write_42_fold_first_20(Gblob) ->
     Gblob1 = write_many(Gblob, 42),
     Opts = [],
-    Fun = fun (Entry, {Count, Entries}) -> 
+    Fun = fun (Entry, {Count, Entries}) ->
                   if Count < 20 -> {continue, {Count + 1, [Entry|Entries]}};
                      true -> {stop, Entries}
                   end
@@ -170,6 +170,9 @@ get_stats_data(Stats) ->
                       {Index, Size, Name}
               end, Stats).
 
+sblob_exists(#sblob_info{path=Path}) ->
+    filelib:is_file(Path).
+
 write_42_get_stats(Gblob=#gblob{path=Path}) ->
     _Gblob1 = write_many(Gblob, 42),
     Stats = gblob_util:get_blobs_info(Path),
@@ -185,14 +188,26 @@ write_42_get_stats(Gblob=#gblob{path=Path}) ->
     E3 = {3, OthersSize, "sblob.3"},
     E4 = {4, OthersSize, "sblob.4"},
 
+    EvictionTests = [check_eviction_size(Path, 0, TotalSize, [], [E0, E1, E2, E3, E4]),
+                     check_eviction_size(Path, FirstSize, TotalSize, [E0], [E1, E2, E3, E4]),
+                     check_eviction_size(Path, FirstSize + SecondSize + 150, TotalSize, [E0, E1], [E2, E3, E4]),
+                     check_eviction_size(Path, TotalSize, TotalSize, [E0, E1, E2, E3, E4], [])],
+
+    ExistBefore = lists:all(fun sblob_exists/1, Stats),
+    Plan = gblob_util:get_eviction_plan_for_size_limit(Path, 0),
+    {RemSize, RemCount, RemErrors} = gblob_util:run_eviction_plan(Plan),
+    RemovedAfter = lists:any(fun sblob_exists/1, Stats),
+
     % Test eviction plan here to avoid writting again
 
     [?_assertEqual(5, length(Stats)),
+     ?_assertEqual(true, ExistBefore),
+     ?_assertEqual(false, RemovedAfter),
+     ?_assertEqual(TotalSize, RemSize),
+     ?_assertEqual(5, RemCount),
+     ?_assertEqual([], RemErrors),
      ?_assertEqual([E0, E1, E2, E3, E4], Data),
-     check_eviction_size(Path, 0, TotalSize, [], [E0, E1, E2, E3, E4]),
-     check_eviction_size(Path, FirstSize, TotalSize, [E0], [E1, E2, E3, E4]),
-     check_eviction_size(Path, FirstSize + SecondSize + 150, TotalSize, [E0, E1], [E2, E3, E4]),
-     check_eviction_size(Path, TotalSize, TotalSize, [E0, E1, E2, E3, E4], [])].
+     EvictionTests].
 
 assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
     [?_assertEqual(EData, Data),
