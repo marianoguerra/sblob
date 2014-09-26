@@ -125,7 +125,7 @@ check_eviction(Gblob=#gblob{path=Path},
 
     if
         ShouldEvict ->
-            lager:info("max interval with no eviction, calling ~s ~p < ~p",
+            lager:debug("max interval with no eviction, calling ~s ~p < ~p",
                        [Path, LastEviction, LastEvictionTime]),
             NewGblob = do_eviction(Gblob),
             State#state{gblob=NewGblob, last_eviction=Now};
