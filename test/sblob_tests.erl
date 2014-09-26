@@ -31,6 +31,9 @@ usage_test_() ->
       fun write_two_read_last/1,
       fun write_two_read_first_and_last/1,
 
+      fun write_4_read_after_last_returns_empty/1,
+      fun write_4_read_before_first_returns_4/1,
+
       fun write_4_read_all/1,
       fun write_4_read_first_2/1,
       fun write_4_read_middle_2/1,
@@ -120,6 +123,20 @@ write_4_read_all(Sblob) ->
     Sblob1 = write_many(Sblob, "asd ", 4),
     {_Sblob2, Result} = sblob:get(Sblob1, 1, 4),
     [?_assertEqual(length(Result), 4)].
+
+write_4_read_after_last_returns_empty(Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    {Sblob2, Result} = sblob:get(Sblob1, 5, 4),
+    {_Sblob3, Result1} = sblob:get(Sblob2, 4, 4),
+    [?_assertEqual(0, length(Result)),
+    ?_assertEqual(1, length(Result1))].
+
+write_4_read_before_first_returns_4(Sblob) ->
+    Sblob1 = write_many(Sblob, "asd ", 4),
+    {Sblob2, Result} = sblob:get(Sblob1, 0, 4),
+    {_Sblob3, Result1} = sblob:get(Sblob2, -10, 4),
+    [?_assertEqual(4, length(Result)),
+    ?_assertEqual(4, length(Result1))].
 
 assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
     [?_assertEqual(Data, EData),

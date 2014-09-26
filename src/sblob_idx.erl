@@ -38,7 +38,12 @@ closest_loop(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->
 % if Key is out of bounds it will throw badarg
 closest(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->
     I = Key - BaseKey,
-    Val = array:get(I, Data),
+    Val = try array:get(I, Data)
+          catch error:badarg ->
+                    lager:error("Error getting entry from index, base key ~p, i ~p, key ~p",
+                                [BaseKey, I, Key]),
+                    error(badarg)
+          end,
     case Val of
         undefined -> closest_loop(Idx, Key - 1);
         _ -> {Key, Val}

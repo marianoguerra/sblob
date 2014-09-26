@@ -68,7 +68,11 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size, name=Name}=Sblob, Timestamp, D
 get(Sblob, SeqNum) ->
     sblob_util:handle_get_one(get(Sblob, SeqNum, 1)).
 
-get(#sblob{fullpath=FullPath}=Sblob, SeqNum, Count) ->
+get(Sblob=#sblob{base_seqnum=BaseSeqNum}, SeqNum, Count) when SeqNum =< BaseSeqNum ->
+    get(Sblob, BaseSeqNum + 1, Count);
+get(Sblob=#sblob{seqnum=LastSeqNum}, SeqNum, _Count) when SeqNum > LastSeqNum ->
+    {Sblob, []};
+get(Sblob=#sblob{fullpath=FullPath}, SeqNum, Count) ->
     lager:debug("get ~s ~p ~p", [FullPath, SeqNum, Count]),
     {OffsetSeqNum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
     {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqNum, SeqNum, false),
