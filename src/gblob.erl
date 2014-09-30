@@ -91,7 +91,7 @@ get(Gblob, SeqNum, Count) ->
            {Sblob1, Res} = sblob:get(Sblob, SeqNum, Count),
            {Gblob1#gblob{current=Sblob1}, Res};
         true ->
-            gblob_util:seqread(Gblob, SeqNum, Count)
+            gblob_util:seqread(Gblob1, SeqNum, Count)
     end,
 
     {Gblob2, Result}.
