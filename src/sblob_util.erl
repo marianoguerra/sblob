@@ -2,6 +2,7 @@
 -export([parse_config/1, now/0, now_fast/0,
          get_handle/1, seek/2, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
+         deep_size/1,
          get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
          get_next/1, get_first/1, get_last/1, read_until/4,
@@ -300,6 +301,16 @@ remove(Path) ->
                                   remove(ChildPath)
                           end, sub_files(Path)),
             file:del_dir(Path)
+    end.
+
+deep_size(Path) ->
+    case filelib:is_dir(Path) of
+        false ->
+            filelib:file_size(Path);
+        true ->
+            lists:foldl(fun(ChildPath, CurSize) ->
+                                  CurSize + deep_size(ChildPath)
+                          end, 0, sub_files(Path))
     end.
 
 get_blob_info(BasePath, Name, Index) ->

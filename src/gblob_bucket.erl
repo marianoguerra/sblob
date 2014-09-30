@@ -60,7 +60,16 @@ handle_call({get, Id, SeqNum}, _From, State) ->
     with_gblob(State, Id, fun(Gblob) -> gblob_server:get(Gblob, SeqNum) end);
 
 handle_call({get, Id, SeqNum, Count}, _From, State) ->
-    with_gblob(State, Id, fun(Gblob) -> gblob_server:get(Gblob, SeqNum, Count) end).
+    with_gblob(State, Id, fun(Gblob) -> gblob_server:get(Gblob, SeqNum, Count) end);
+
+handle_call(size, _From, State=#state{path=Path}) ->
+    T1 = sblob_util:now_fast(),
+    Size = sblob_util:deep_size(Path),
+    T2 = sblob_util:now_fast(),
+    TotalTime = T2 - T1,
+    lager:info("calculating size for ~s: ~p bytes in ~p ms",
+               [Path, Size, TotalTime]),
+    {reply, Size, State}.
 
 handle_cast(Msg, State) ->
     io:format("Unexpected handle cast message: ~p~n",[Msg]),
