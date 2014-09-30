@@ -6,6 +6,7 @@
          seqread/3,
          fold/4,
          get_eviction_plan_for_size_limit/2,
+         get_eviction_plan_for_current_size_percent/2,
          run_eviction_plan/1,
          log_eviction_results/2,
          get_blobs_info/1,
@@ -131,7 +132,10 @@ get_blobs_info(BasePath) ->
     Fun = fun (Index) -> get_blob_info_by_index(Index, BasePath) end,
     SblobsWithIndex = lists:map(Fun, Indexes),
     CurrentStats = sblob_util:get_blob_info(BasePath, "sblob", 0),
-    [CurrentStats|SblobsWithIndex].
+    BlobStats = [CurrentStats|SblobsWithIndex],
+    SumSizes = fun (#sblob_info{size=Size}, CurSize) -> CurSize + Size end,
+    TotalSize = lists:foldl(SumSizes, 0, BlobStats),
+    {TotalSize, BlobStats}.
 
 partition_by_size(Stats, MaxSizeBytes) ->
     partition_by_size(Stats, MaxSizeBytes, 0, [], []).
@@ -153,8 +157,13 @@ partition_by_size([#sblob_info{size=Size}=Stat|T], MaxSizeBytes, CurTotalSize,
             partition_by_size(T, MaxSizeBytes, NewCurTotalSize, NewToKeep, ToRemove)
     end.
 
+get_eviction_plan_for_current_size_percent(BasePath, CurSizePercentage) when CurSizePercentage =< 1 ->
+    {TotalSize, Stats} = get_blobs_info(BasePath),
+    MaxSizeBytes = round(TotalSize * CurSizePercentage),
+    partition_by_size(Stats, MaxSizeBytes).
+
 get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
-    Stats = get_blobs_info(BasePath),
+    {_TotalSize, Stats} = get_blobs_info(BasePath),
     partition_by_size(Stats, MaxSizeBytes).
 
 evict(Path) ->

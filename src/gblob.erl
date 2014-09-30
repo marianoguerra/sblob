@@ -1,6 +1,7 @@
 -module(gblob).
 
--export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3, check_eviction/1]).
+-export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3,
+         check_eviction/1, truncate/2, truncate_percentage/2]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include("gblob.hrl").
@@ -95,10 +96,7 @@ get(Gblob, SeqNum, Count) ->
 
     {Gblob2, Result}.
 
-check_eviction(Gblob=#gblob{path=Path, config=Config, name=Name}) ->
-    % leave half the max size so we don't evict too often
-    MaxSizeBytes = Config#gblob_cfg.max_size_bytes * 0.5,
-    Plan = gblob_util:get_eviction_plan_for_size_limit(Path, MaxSizeBytes),
+evict(Gblob=#gblob{path=Path, config=Config, name=Name}, Plan) ->
     Result = gblob_util:run_eviction_plan(Plan),
     {RemSize, _, _} = Result,
     NewGblob = if
@@ -109,3 +107,15 @@ check_eviction(Gblob=#gblob{path=Path, config=Config, name=Name}) ->
                end,
     {NewGblob, Result}.
 
+truncate_percentage(Gblob=#gblob{path=Path}, Percentage) ->
+    Plan = gblob_util:get_eviction_plan_for_current_size_percent(Path, Percentage),
+    evict(Gblob, Plan).
+
+truncate(Gblob=#gblob{path=Path}, MaxSizeBytes) ->
+    Plan = gblob_util:get_eviction_plan_for_size_limit(Path, MaxSizeBytes),
+    evict(Gblob, Plan).
+
+check_eviction(Gblob=#gblob{config=Config}) ->
+    % leave half the max size so we don't evict too often
+    MaxSizeBytes = Config#gblob_cfg.max_size_bytes * 0.5,
+    truncate(Gblob, MaxSizeBytes).

@@ -21,6 +21,8 @@ usage_test_() ->
       fun write_42_fold_42/1,
       fun write_42_fold_first_20/1,
       fun write_42_get_stats/1,
+      fun write_42_evict_by_size/1,
+      fun write_42_evict_by_current_size_percent/1,
       fun write_4_in_two_parts_read_all/1,
       fun write_100_in_two_parts_read_all/1,
       fun write_rotate_reopen_write/1,
@@ -167,6 +169,17 @@ check_eviction_size(Path, MaxSizeBytes, ExpectedSize, EToKeep, EToRemove) ->
      ?_assertEqual(EToKeep, ToKeepData),
      ?_assertEqual(EToRemove, ToRemoveData)].
 
+check_eviction_perc(Path, Perc, ExpectedSize, EToKeep, EToRemove) ->
+    Resp = gblob_util:get_eviction_plan_for_current_size_percent(Path, Perc),
+    {TotalSize, ToKeep, ToRemove} = Resp,
+
+    ToKeepData = get_stats_data(ToKeep),
+    ToRemoveData = get_stats_data(ToRemove),
+
+    [?_assertEqual(ExpectedSize, TotalSize),
+     ?_assertEqual(EToKeep, ToKeepData),
+     ?_assertEqual(EToRemove, ToRemoveData)].
+
 get_stats_data(Stats) ->
     lists:map(fun (#sblob_info{index=Index, size=Size, name=Name}) ->
                       {Index, Size, Name}
@@ -177,7 +190,7 @@ sblob_exists(#sblob_info{path=Path}) ->
 
 write_42_get_stats(Gblob=#gblob{path=Path}) ->
     _Gblob1 = write_many(Gblob, 42),
-    Stats = gblob_util:get_blobs_info(Path),
+    {StatsTotalSize, Stats} = gblob_util:get_blobs_info(Path),
     Data = get_stats_data(Stats),
     FirstSize = 62,
     SecondSize = 300,
@@ -190,10 +203,34 @@ write_42_get_stats(Gblob=#gblob{path=Path}) ->
     E3 = {3, OthersSize, "sblob.3"},
     E4 = {4, OthersSize, "sblob.4"},
 
-    EvictionTests = [check_eviction_size(Path, 0, TotalSize, [], [E0, E1, E2, E3, E4]),
-                     check_eviction_size(Path, FirstSize, TotalSize, [E0], [E1, E2, E3, E4]),
-                     check_eviction_size(Path, FirstSize + SecondSize + 150, TotalSize, [E0, E1], [E2, E3, E4]),
-                     check_eviction_size(Path, TotalSize, TotalSize, [E0, E1, E2, E3, E4], [])],
+    % Test eviction plan here to avoid writting again
+
+    [?_assertEqual(5, length(Stats)),
+     ?_assertEqual(TotalSize, StatsTotalSize),
+     ?_assertEqual([E0, E1, E2, E3, E4], Data)].
+
+write_42_evict_by_size(Gblob=#gblob{path=Path}) ->
+    _Gblob1 = write_many(Gblob, 42),
+    {StatsTotalSize, Stats} = gblob_util:get_blobs_info(Path),
+    FirstSize = 62,
+    SecondSize = 300,
+    OthersSize = 310,
+    TotalSize = 1292,
+
+    E0 = {0, FirstSize, "sblob"},
+    E1 = {1, SecondSize, "sblob.1"},
+    E2 = {2, OthersSize, "sblob.2"},
+    E3 = {3, OthersSize, "sblob.3"},
+    E4 = {4, OthersSize, "sblob.4"},
+
+    EvictionTests = [check_eviction_size(Path, 0, TotalSize, [],
+                                         [E0, E1, E2, E3, E4]),
+                     check_eviction_size(Path, FirstSize, TotalSize, [E0],
+                                         [E1, E2, E3, E4]),
+                     check_eviction_size(Path, FirstSize + SecondSize + 150,
+                                         TotalSize, [E0, E1], [E2, E3, E4]),
+                     check_eviction_size(Path, TotalSize, TotalSize,
+                                         [E0, E1, E2, E3, E4], [])],
 
     ExistBefore = lists:all(fun sblob_exists/1, Stats),
     Plan = gblob_util:get_eviction_plan_for_size_limit(Path, 0),
@@ -203,12 +240,51 @@ write_42_get_stats(Gblob=#gblob{path=Path}) ->
     % Test eviction plan here to avoid writting again
 
     [?_assertEqual(5, length(Stats)),
+     ?_assertEqual(TotalSize, StatsTotalSize),
      ?_assertEqual(true, ExistBefore),
      ?_assertEqual(false, RemovedAfter),
      ?_assertEqual(TotalSize, RemSize),
      ?_assertEqual(5, RemCount),
      ?_assertEqual([], RemErrors),
-     ?_assertEqual([E0, E1, E2, E3, E4], Data),
+     EvictionTests].
+
+write_42_evict_by_current_size_percent(Gblob=#gblob{path=Path}) ->
+    _Gblob1 = write_many(Gblob, 42),
+    {StatsTotalSize, Stats} = gblob_util:get_blobs_info(Path),
+    FirstSize = 62,
+    SecondSize = 300,
+    OthersSize = 310,
+    TotalSize = 1292,
+
+    E0 = {0, FirstSize, "sblob"},
+    E1 = {1, SecondSize, "sblob.1"},
+    E2 = {2, OthersSize, "sblob.2"},
+    E3 = {3, OthersSize, "sblob.3"},
+    E4 = {4, OthersSize, "sblob.4"},
+
+    EvictionTests = [check_eviction_perc(Path, 0, TotalSize, [],
+                                         [E0, E1, E2, E3, E4]),
+                     check_eviction_perc(Path, 1, TotalSize,
+                                         [E0, E1, E2, E3, E4], []),
+                     check_eviction_perc(Path, 0.5, TotalSize,
+                                         [E0, E1], [E2, E3, E4]),
+                     check_eviction_perc(Path, 0.9, TotalSize,
+                                         [E0, E1, E2, E3], [E4])],
+
+    ExistBefore = lists:all(fun sblob_exists/1, Stats),
+    Plan = gblob_util:get_eviction_plan_for_current_size_percent(Path, 0.5),
+    {RemSize, RemCount, RemErrors} = gblob_util:run_eviction_plan(Plan),
+    RemovedAfter = lists:map(fun sblob_exists/1, Stats),
+
+    % Test eviction plan here to avoid writting again
+
+    [?_assertEqual(5, length(Stats)),
+     ?_assertEqual(TotalSize, StatsTotalSize),
+     ?_assertEqual(true, ExistBefore),
+     ?_assertEqual([true, true, false, false, false], RemovedAfter),
+     ?_assertEqual(930, RemSize),
+     ?_assertEqual(3, RemCount),
+     ?_assertEqual([], RemErrors),
      EvictionTests].
 
 assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
