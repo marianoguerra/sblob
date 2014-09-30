@@ -1,7 +1,7 @@
 -module(gblob).
 
 -export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3,
-         check_eviction/1, truncate/2, truncate_percentage/2]).
+         check_eviction/1, truncate/2, truncate_percentage/2, size/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 -include("gblob.hrl").
@@ -95,6 +95,10 @@ get(Gblob, SeqNum, Count) ->
     end,
 
     {Gblob2, Result}.
+
+size(Gblob=#gblob{path=Path}) ->
+    {TotalSize, _BlobStats} = gblob_util:get_blobs_info(Path),
+    {Gblob, TotalSize}.
 
 evict(Gblob=#gblob{path=Path, config=Config, name=Name}, Plan) ->
     Result = gblob_util:run_eviction_plan(Plan),

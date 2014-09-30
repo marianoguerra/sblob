@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([start/2, start/3, stop/1, put/2, put/3, get/2, get/3, status/1,
-        truncate/2, truncate_percentage/2]).
+        truncate/2, truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
 
@@ -47,6 +47,9 @@ truncate_percentage(Pid, Percentage) when Percentage =< 1 ->
 status(Pid) ->
     gen_server:call(Pid, status).
 
+size(Pid) ->
+    gen_server:call(Pid, size).
+
 %% Server implementation, a.k.a.: callbacks
 
 init([Path, Opts, ServerOpts]) ->
@@ -90,6 +93,11 @@ handle_call({truncate_percentage, Percentage}, _From, State=#state{gblob=Gblob})
     lager:info("truncate percentage ~s ~p", [Gblob#gblob.path, Percentage]),
     NewState = update_gblob(State, NewGblob),
     {reply, Result, NewState, State#state.check_interval_ms};
+
+handle_call(size, _From, State=#state{gblob=Gblob}) ->
+    {NewGblob, Size} = gblob:size(Gblob),
+    NewState = update_gblob(State, NewGblob),
+    {reply, Size, NewState};
 
 handle_call({truncate, SizeBytes}, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Result} = gblob:truncate(Gblob, SizeBytes),

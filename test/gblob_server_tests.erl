@@ -10,6 +10,7 @@ usage_test_() ->
      fun usage_stop/1,
      [fun do_nothing/1,
       fun write_100/1,
+      fun write_100_get_size/1,
       fun write_100_truncate/1,
       fun write_100_truncate_half/1,
       fun write_100_read_1/1,
@@ -90,6 +91,11 @@ write_100(Gblob) ->
      assert_entry(E7, <<"item 96">>, 97),
      assert_entry(E8, <<"item 97">>, 98),
      assert_entry(E9, <<"item 98">>, 99)].
+
+write_100_get_size(Gblob) ->
+    write_many(Gblob, 100),
+    Size = gblob_server:size(Gblob), 
+    [?_assertEqual(3090, Size)].
 
 write_100_truncate(Gblob) ->
     write_many(Gblob, 99),
