@@ -221,7 +221,12 @@ do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
             {R1, nil, nil, Rc1} ->
                 {Gblob1, R1, SeqNum + Rc1, Rc1};
             {R2, FirstSeqNum, _LastSeqNum, Rc2} ->
-                NewIndex = sblob_idx:put(Index, ChunkNum, FirstSeqNum),
+                % ignore bounds of the current chunk
+                NewIndex = if ChunkNum == 0 ->
+                                  Index;
+                              true ->
+                                  sblob_idx:put(Index, ChunkNum, FirstSeqNum)
+                           end,
                 Gblob2 = Gblob1#gblob{index=NewIndex},
                 {Gblob2, R2, SeqNum + Rc2, Rc2}
         end,
@@ -248,7 +253,7 @@ seqread(#gblob{path=Path}=Gblob, ChunkNum, SeqNum, Count, ReadAhead, Accum) ->
     ChunkName = chunk_name(ChunkNum),
     do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum).
 
-seqread(#gblob{index=Idx}=Gblob, SeqNum, Count) ->
+seqread(Gblob, SeqNum, Count) ->
     {Gblob1, Idx} = get_index(Gblob),
     BaseChunk = case sblob_idx:closest_value(Idx, SeqNum) of
         notfound -> 1;
