@@ -90,7 +90,7 @@ handle_call({get, SeqNum, Count}, _From, State=#state{gblob=Gblob}) ->
 
 handle_call({truncate_percentage, Percentage}, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Result} = gblob:truncate_percentage(Gblob, Percentage),
-    lager:info("truncate percentage ~s ~p", [Gblob#gblob.path, Percentage]),
+    lager:info("truncate percentage ~s ~p", [NewGblob#gblob.path, Percentage]),
     NewState = update_gblob(State, NewGblob),
     {reply, Result, NewState, State#state.check_interval_ms};
 

@@ -81,7 +81,7 @@ handle_call(size, _From, State) ->
     GetSizes = fun ({Id, Gblob}, {CurTotalSize, CurSizes}) ->
                        Size = gblob_server:size(Gblob),
                        NewTotalSize = CurTotalSize + Size,
-                       NewCurSizes = [{list_to_binary(Id), Size}|CurSizes],
+                       NewCurSizes = [{Id, Size}|CurSizes],
                        {NewTotalSize, NewCurSizes}
                end,
 
@@ -144,7 +144,7 @@ foreach_active_gblob(#state{gblobs=Gblobs}=State, Fun) ->
 
 get_gblob_names(Path) ->
     {ok, SubFiles} = file:list_dir(Path),
-    SubFiles.
+    lists:map(fun list_to_binary/1, SubFiles).
 
 map_gblobs(State, Fun) ->
     foldl_gblobs(State, fun (Item, Results) ->
