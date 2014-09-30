@@ -10,6 +10,8 @@ usage_test_() ->
      fun usage_stop/1,
      [fun do_nothing/1,
       fun write_100/1,
+      fun write_100_truncate/1,
+      fun write_100_truncate_half/1,
       fun write_100_read_1/1,
       fun write_100_read_100/1,
       fun write_100_read_first_50/1,
@@ -88,6 +90,31 @@ write_100(Gblob) ->
      assert_entry(E7, <<"item 96">>, 97),
      assert_entry(E8, <<"item 97">>, 98),
      assert_entry(E9, <<"item 98">>, 99)].
+
+write_100_truncate(Gblob) ->
+    write_many(Gblob, 99),
+    TruncateResult = gblob_server:truncate(Gblob, 0),
+    ?debugVal(TruncateResult),
+    Result = gblob_server:get(Gblob, 91, 10),
+    [?_assertEqual([], Result)].
+
+write_100_truncate_half(Gblob) ->
+    write_many(Gblob, 99),
+    TruncateResult = gblob_server:truncate_percentage(Gblob, 0.5),
+    ?debugVal(TruncateResult),
+    Result = gblob_server:get(Gblob, 0, 10),
+    ?assertEqual(10, length(Result)),
+    [E1, E2, E3, E4, E5, E6, E7, E8, E9, E10] = Result,
+    [assert_entry(E1, <<"item 50">>, 51),
+     assert_entry(E2, <<"item 51">>, 52),
+     assert_entry(E3, <<"item 52">>, 53),
+     assert_entry(E4, <<"item 53">>, 54),
+     assert_entry(E5, <<"item 54">>, 55),
+     assert_entry(E6, <<"item 55">>, 56),
+     assert_entry(E7, <<"item 56">>, 57),
+     assert_entry(E8, <<"item 57">>, 58),
+     assert_entry(E9, <<"item 58">>, 59),
+     assert_entry(E10, <<"item 59">>, 60)].
 
 write_100_read_1(Gblob) ->
     write_many(Gblob, 100),

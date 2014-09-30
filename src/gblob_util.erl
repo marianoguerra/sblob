@@ -132,7 +132,7 @@ get_blobs_info(BasePath) ->
     Fun = fun (Index) -> get_blob_info_by_index(Index, BasePath) end,
     SblobsWithIndex = lists:map(Fun, Indexes),
     CurrentStats = sblob_util:get_blob_info(BasePath, "sblob", 0),
-    BlobStats = [CurrentStats|SblobsWithIndex],
+    BlobStats = [CurrentStats|lists:reverse(SblobsWithIndex)],
     SumSizes = fun (#sblob_info{size=Size}, CurSize) -> CurSize + Size end,
     TotalSize = lists:foldl(SumSizes, 0, BlobStats),
     {TotalSize, BlobStats}.

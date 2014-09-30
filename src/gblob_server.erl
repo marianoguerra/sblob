@@ -1,8 +1,10 @@
 -module(gblob_server).
 -behaviour(gen_server).
 
--export([start/2, start/3, stop/1, put/2, put/3, get/2, get/3, status/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([start/2, start/3, stop/1, put/2, put/3, get/2, get/3, status/1,
+        truncate/2, truncate_percentage/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
+         code_change/3]).
 
 -include("gblob.hrl").
 -record(state, {gblob,
@@ -35,6 +37,12 @@ get(Pid, SeqNum) ->
 
 get(Pid, SeqNum, Count) ->
     gen_server:call(Pid, {get, SeqNum, Count}).
+
+truncate(Pid, SizeBytes) ->
+    gen_server:call(Pid, {truncate, SizeBytes}).
+
+truncate_percentage(Pid, Percentage) when Percentage =< 1 ->
+    gen_server:call(Pid, {truncate_percentage, Percentage}).
 
 status(Pid) ->
     gen_server:call(Pid, status).
@@ -74,6 +82,17 @@ handle_call({get, SeqNum}, _From, State=#state{gblob=Gblob}) ->
 
 handle_call({get, SeqNum, Count}, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Result} = gblob:get(Gblob, SeqNum, Count),
+    NewState = update_gblob(State, NewGblob),
+    {reply, Result, NewState, State#state.check_interval_ms};
+
+handle_call({truncate_percentage, Percentage}, _From, State=#state{gblob=Gblob}) ->
+    {NewGblob, Result} = gblob:truncate_percentage(Gblob, Percentage),
+    lager:info("truncate percentage ~s ~p", [Gblob#gblob.path, Percentage]),
+    NewState = update_gblob(State, NewGblob),
+    {reply, Result, NewState, State#state.check_interval_ms};
+
+handle_call({truncate, SizeBytes}, _From, State=#state{gblob=Gblob}) ->
+    {NewGblob, Result} = gblob:truncate(Gblob, SizeBytes),
     NewState = update_gblob(State, NewGblob),
     {reply, Result, NewState, State#state.check_interval_ms}.
 

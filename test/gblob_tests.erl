@@ -207,7 +207,7 @@ write_42_get_stats(Gblob=#gblob{path=Path}) ->
 
     [?_assertEqual(5, length(Stats)),
      ?_assertEqual(TotalSize, StatsTotalSize),
-     ?_assertEqual([E0, E1, E2, E3, E4], Data)].
+     ?_assertEqual([E0, E4, E3, E2, E1], Data)].
 
 write_42_evict_by_size(Gblob=#gblob{path=Path}) ->
     _Gblob1 = write_many(Gblob, 42),
@@ -224,13 +224,13 @@ write_42_evict_by_size(Gblob=#gblob{path=Path}) ->
     E4 = {4, OthersSize, "sblob.4"},
 
     EvictionTests = [check_eviction_size(Path, 0, TotalSize, [],
-                                         [E0, E1, E2, E3, E4]),
+                                         [E0, E4, E3, E2, E1]),
                      check_eviction_size(Path, FirstSize, TotalSize, [E0],
-                                         [E1, E2, E3, E4]),
+                                         [E4, E3, E2, E1]),
                      check_eviction_size(Path, FirstSize + SecondSize + 150,
-                                         TotalSize, [E0, E1], [E2, E3, E4]),
+                                         TotalSize, [E0, E4], [E3, E2, E1]),
                      check_eviction_size(Path, TotalSize, TotalSize,
-                                         [E0, E1, E2, E3, E4], [])],
+                                         [E0, E4, E3, E2, E1], [])],
 
     ExistBefore = lists:all(fun sblob_exists/1, Stats),
     Plan = gblob_util:get_eviction_plan_for_size_limit(Path, 0),
@@ -263,13 +263,13 @@ write_42_evict_by_current_size_percent(Gblob=#gblob{path=Path}) ->
     E4 = {4, OthersSize, "sblob.4"},
 
     EvictionTests = [check_eviction_perc(Path, 0, TotalSize, [],
-                                         [E0, E1, E2, E3, E4]),
+                                         [E0, E4, E3, E2, E1]),
                      check_eviction_perc(Path, 1, TotalSize,
-                                         [E0, E1, E2, E3, E4], []),
+                                         [E0, E4, E3, E2, E1], []),
                      check_eviction_perc(Path, 0.5, TotalSize,
-                                         [E0, E1], [E2, E3, E4]),
+                                         [E0, E4], [E3, E2, E1]),
                      check_eviction_perc(Path, 0.9, TotalSize,
-                                         [E0, E1, E2, E3], [E4])],
+                                         [E0, E4, E3, E2], [E1])],
 
     ExistBefore = lists:all(fun sblob_exists/1, Stats),
     Plan = gblob_util:get_eviction_plan_for_current_size_percent(Path, 0.5),
@@ -282,7 +282,7 @@ write_42_evict_by_current_size_percent(Gblob=#gblob{path=Path}) ->
      ?_assertEqual(TotalSize, StatsTotalSize),
      ?_assertEqual(true, ExistBefore),
      ?_assertEqual([true, true, false, false, false], RemovedAfter),
-     ?_assertEqual(930, RemSize),
+     ?_assertEqual(920, RemSize),
      ?_assertEqual(3, RemCount),
      ?_assertEqual([], RemErrors),
      EvictionTests].
