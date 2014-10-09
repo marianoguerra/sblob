@@ -28,7 +28,7 @@ close(#sblob{handle=nil}=Sblob) ->
     Sblob;
 close(#sblob{handle=Handle}=Sblob) ->
     lager:debug("close ~p", [lager:pr(Sblob, ?MODULE)]),
-    case file:close(Handle) of
+    case file_handle_cache:close(Handle) of
         ok -> ok;
         {error, einval} ->
             lager:warning("closing invalid file handle? ~p ~p", [Handle, lager:pr(Sblob, ?MODULE)])
@@ -51,7 +51,7 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size, name=Name}=Sblob, Timestamp, D
     NewSeqNum = SeqNum + 1,
     lager:debug("put ~s ~p ~p", [Name, NewSeqNum, Timestamp]),
     Blob = sblob_util:to_binary(Timestamp, NewSeqNum, Data),
-    ok = file:write(Handle, Blob),
+    ok = file_handle_cache:append(Handle, Blob),
 
     EntryOffset = Size,
     NewIndex = sblob_idx:put(Index, NewSeqNum, EntryOffset),

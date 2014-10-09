@@ -38,9 +38,10 @@ parse_config([{base_seqnum, Val}|T], Config) ->
 parse_config([], Config) ->
     Config.
 
-open_file(Path, ReadAhead) ->
-    {ok, Handle} = file:open(Path, [append, read, raw, binary,
-                                    {read_ahead, ReadAhead}]),
+open_file(Path, _ReadAhead) ->
+    % XXX ignore ReadAhead for now since not on file_handle_cache
+    % TODO: see last opetions to open
+    {ok, Handle} = file_handle_cache:open(Path, [raw, binary, read, append], []),
     Handle.
 
 % return the file handle to the current chunk, if not open already open it
@@ -49,7 +50,7 @@ get_handle(#sblob{fullpath=FullPath, handle=nil,
                   config=#sblob_cfg{read_ahead=ReadAhead}}=Sblob) ->
     lager:debug("get handle ~s", [FullPath]),
     Handle = open_file(FullPath, ReadAhead),
-    {ok, Size} = file:position(Handle, eof),
+    {ok, Size} = file_handle_cache:position(Handle, eof),
     {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}};
 
 get_handle(#sblob{handle=Handle}=Sblob) ->
@@ -62,7 +63,7 @@ seek(#sblob{handle=nil}=Sblob, Location) ->
     seek(Sblob1, Location);
 seek(#sblob{handle=Handle, name=Name}=Sblob, Location) ->
     lager:debug("seek ~s ~p", [Name, Location]),
-    {ok, NewPos} = file:position(Handle, Location),
+    {ok, NewPos} = file_handle_cache:position(Handle, Location),
     Sblob#sblob{position=NewPos}.
 
 seek_to_seqnum(Sblob, SeqNum) ->
@@ -71,7 +72,7 @@ seek_to_seqnum(Sblob, SeqNum) ->
         notfound -> {nil, 0};
         Result -> Result
     end,
-    {ok, NewPos} = file:position(Handle, {bof, Offset}),
+    {ok, NewPos} = file_handle_cache:position(Handle, {bof, Offset}),
     {OffsetKey, NewSblob#sblob{position=NewPos}}.
 
 fill_bounds(#sblob{name=Name}=Sblob) ->
@@ -100,7 +101,7 @@ read(#sblob{handle=nil}=Sblob, Len) ->
     read(NewSblob, Len);
 
 read(#sblob{position=Pos, handle=Handle}=Sblob, Len) ->
-    {Sblob#sblob{position=Pos + Len}, file:read(Handle, Len)}.
+    {Sblob#sblob{position=Pos + Len}, file_handle_cache:read(Handle, Len)}.
 
 to_binary(#sblob_entry{timestamp=Timestamp, seqnum=SeqNum, data=Data}) ->
     to_binary(Timestamp, SeqNum, Data).
@@ -140,12 +141,12 @@ offset_for_seqnum(#sblob{index=Idx}, SeqNum) ->
     Result.
 
 raw_get_next(Handle) ->
-     case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
+     case file_handle_cache:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
          {ok, Header} ->
 
              HeaderEntry = header_from_binary(Header),
              Len = HeaderEntry#sblob_entry.len,
-             {ok, Tail} = file:read(Handle, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
+             {ok, Tail} = file_handle_cache:read(Handle, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
              Data = binary:part(Tail, 0, Len),
              Entry = HeaderEntry#sblob_entry{data=Data,
                                              size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
@@ -260,7 +261,7 @@ seqread(Path, ChunkName, SeqNum, Count, Opts) ->
 do_fold(Handle, Fun, Acc0) ->
     case raw_get_next(Handle) of
         eof ->
-            file:close(Handle),
+            file_handle_cache:close(Handle),
             {eof, Acc0};
 
         Entry ->
@@ -269,7 +270,7 @@ do_fold(Handle, Fun, Acc0) ->
                     do_fold(Handle, Fun, Acc1);
 
                 {stop, _AccEnd}=Res -> 
-                    file:close(Handle),
+                    file_handle_cache:close(Handle),
                     Res
             end
     end.

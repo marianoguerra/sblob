@@ -2,6 +2,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 usage_test_() ->
+    file_handle_cache:start_link(),
     ?debugMsg("starting gblob bucket usage tests"),
     {foreach,
      fun usage_start/0,

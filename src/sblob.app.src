@@ -5,7 +5,7 @@
   {description, "Persist Stream of Blobs to Disk"},
   {vsn, "0.0.1"},
   {modules, []},
-  {applications, [kernel, stdlib]},
+  {applications, [kernel, stdlib, gen_server2, file_handle_cache]},
   {registered, []},
   {mod, {sblob, []}},
   {env, []},
