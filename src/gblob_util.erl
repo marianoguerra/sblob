@@ -186,8 +186,13 @@ log_eviction_error(Error) ->
     lager:error("eviction error ~p", [Error]).
 
 log_eviction_results(Path, {RemovedSize, RemovedCount, Errors}) ->
-    lager:info("run eviction on ~s, removed ~p blobs (~p bytes) with ~p errors",
-               [Path, RemovedCount, RemovedSize, length(Errors)]),
+    Msg = "run eviction on ~s, removed ~p blobs (~p bytes) with ~p errors",
+    Args = [Path, RemovedCount, RemovedSize, length(Errors)],
+
+    if RemovedSize > 0 -> lager:info(Msg, Args);
+       true -> lager:debug(Msg, Args)
+    end,
+
     lists:foreach(fun log_eviction_error/1, Errors),
     ok.
 
