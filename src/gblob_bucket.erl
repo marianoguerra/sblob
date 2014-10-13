@@ -6,7 +6,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
 
--record(state, {gblobs, gblob_opts, bucket_opts, path}).
+-record(state, {gblobs_sup, gblobs, gblob_opts, bucket_opts, path}).
 -record(bucket_cfg, {max_items}).
 
 %% Public API
@@ -42,8 +42,9 @@ state(Module) ->
 
 init([Path, GblobOpts, BucketOpts]) ->
     Gblobs = sblob_preg:new(),
+    {ok, GblobsSup} = gblob_server_sup:start_link(),
     BucketConfig = parse_opts(BucketOpts),
-    State = #state{gblobs=Gblobs, gblob_opts=GblobOpts,
+    State = #state{gblobs_sup=GblobsSup, gblobs=Gblobs, gblob_opts=GblobOpts,
                    bucket_opts=BucketConfig, path=Path},
     {ok, State}.
 
@@ -120,20 +121,20 @@ with_gblob(State, Id, Fun) ->
     Result = Fun(Gblob),
     {reply, Result, NewState}.
 
-create_gblob(Gblobs, Path, Opts, Id) ->
-    {ok, Gblob} = gblob_server:start(Path, Opts),
+create_gblob(GblobsSup, Gblobs, Path, Opts, Id) ->
+    {ok, Gblob} = gblob_server_sup:start_child(GblobsSup, [Path, Opts]),
     NewGblobs = sblob_preg:put(Gblobs, Id, Gblob),
     {NewGblobs, Gblob}.
 
 to_list(Data) when is_list(Data) -> Data;
 to_list(Data) when is_binary(Data) -> binary_to_list(Data).
 
-get_gblob(#state{gblobs=Gblobs, gblob_opts=Opts, path=Path}=State, Id) ->
+get_gblob(#state{gblobs_sup=GblobsSup, gblobs=Gblobs, gblob_opts=Opts, path=Path}=State, Id) ->
     {NewGblobs, Gblob} = case sblob_preg:get(Gblobs, Id) of
         none ->
             IdStr = to_list(Id),
             GblobPath = filename:join([Path, IdStr]),
-            create_gblob(Gblobs, GblobPath, Opts, Id);
+            create_gblob(GblobsSup, Gblobs, GblobPath, Opts, Id);
         {value, FoundGblob} -> {Gblobs, FoundGblob}
     end,
     {State#state{gblobs=NewGblobs}, Gblob}.

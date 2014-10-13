@@ -25,7 +25,7 @@ usage_test_() ->
 
 new_gblob_server(ServerOpts) ->
     Path = io_lib:format("gblob-~p", [sblob_util:now()]),
-    {ok, Gblob} = gblob_server:start(Path, [{max_items, 10}], ServerOpts),
+    {ok, Gblob} = gblob_server:start_link(Path, [{max_items, 10}], ServerOpts),
     Gblob.
 
 cleanup_on_inactivity_test() ->

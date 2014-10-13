@@ -1,7 +1,7 @@
 -module(gblob_server).
 -behaviour(gen_server).
 
--export([start/2, start/3, stop/1, put/2, put/3, get/2, get/3, status/1,
+-export([start_link/2, start_link/3, stop/1, put/2, put/3, get/2, get/3, status/1,
         truncate/2, truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -17,11 +17,11 @@
 
 %% Public API
 
-start(Path, GblobOpts) ->
-    start(Path, GblobOpts, []).
+start_link(Path, GblobOpts) ->
+    start_link(Path, GblobOpts, []).
 
-start(Path, GblobOpts, ServerOpts) ->
-    gen_server:start(?MODULE, [Path, GblobOpts, ServerOpts], []).
+start_link(Path, GblobOpts, ServerOpts) ->
+    gen_server:start_link(?MODULE, [Path, GblobOpts, ServerOpts], []).
 
 stop(Module) ->
     gen_server:call(Module, stop).
