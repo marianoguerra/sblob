@@ -93,6 +93,10 @@ handle_cast(Msg, State) ->
     io:format("Unexpected handle cast message: ~p~n",[Msg]),
     {noreply, State}.
 
+handle_info({'DOWN', _MonitorRef, process, Pid, _Info}, State=#state{gblobs=Gblobs}) ->
+    NewGblobs = sblob_preg:remove_reverse(Gblobs, Pid),
+    {noreply, State#state{gblobs=NewGblobs}};
+
 handle_info(Msg, State) ->
     io:format("Unexpected handle info message: ~p~n",[Msg]),
     {noreply, State}.
@@ -123,6 +127,7 @@ with_gblob(State, Id, Fun) ->
 
 create_gblob(GblobsSup, Gblobs, Path, Opts, Id) ->
     {ok, Gblob} = gblob_server_sup:start_child(GblobsSup, [Path, Opts]),
+    erlang:monitor(process, Gblob),
     NewGblobs = sblob_preg:put(Gblobs, Id, Gblob),
     {NewGblobs, Gblob}.
 
