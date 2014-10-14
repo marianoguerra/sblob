@@ -59,3 +59,13 @@ put_get_reverse_del_reverse_test() ->
     ?assertEqual(none, Res1),
     ?assertEqual(none, ResRev1).
 
+foreach_test() ->
+    Preg = new(),
+    put(Preg, mykey, myval),
+    put(Preg, otherkey, otherval),
+    sblob_preg:foreach(Preg, fun (Key, Val) ->
+                                     IsFirst = (Key == mykey andalso Val == myval),
+                                     IsSecond = (Key == otherkey andalso Val == otherval),
+                                     IsOne = IsFirst orelse IsSecond,
+                                     true = IsOne
+                             end).

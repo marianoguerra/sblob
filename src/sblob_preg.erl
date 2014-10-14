@@ -57,9 +57,9 @@ foreach(Preg, Fun, Key={val, _Val}) ->
     NextKey = ets:next(Preg, Key),
     foreach(Preg, Fun, NextKey);
 
-foreach(Preg, Fun, {key, Key}) ->
+foreach(Preg, Fun, WholeKey={key, Key}) ->
     {value, Val} = get(Preg, Key),
     Fun(Key, Val),
-    NextKey = ets:next(Preg, Key),
+    NextKey = ets:next(Preg, WholeKey),
     foreach(Preg, Fun, NextKey).
 
