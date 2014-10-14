@@ -21,7 +21,7 @@ usage_stop(Bucket) ->
 
 new_gblob_bucket() ->
     Path = io_lib:format("bucket-~p", [sblob_util:now()]),
-    {ok, Bucket} = gblob_bucket:start(Path, [{max_items, 10}], []),
+    {ok, Bucket} = gblob_bucket:start_link(Path, [{max_items, 10}], []),
     Bucket.
 
 num_to_data(Num) ->

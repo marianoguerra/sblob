@@ -1,7 +1,7 @@
 -module(gblob_bucket).
 -behaviour(gen_server).
 
--export([start/3, stop/1, state/1, put/3, put/4, get/3, get/4,
+-export([start_link/3, stop/1, state/1, put/3, put/4, get/3, get/4,
          truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -11,8 +11,8 @@
 
 %% Public API
 
-start(Path, GblobOpts, BucketOpts) ->
-    gen_server:start(?MODULE, [Path, GblobOpts, BucketOpts], []).
+start_link(Path, GblobOpts, BucketOpts) ->
+    gen_server:start_link(?MODULE, [Path, GblobOpts, BucketOpts], []).
 
 stop(Module) ->
     gen_server:call(Module, stop).
