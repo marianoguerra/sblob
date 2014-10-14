@@ -39,9 +39,18 @@ parse_config([], Config) ->
     Config.
 
 open_file(Path, _ReadAhead) ->
+    open_file(Path, _ReadAhead, file_handle_cache).
+
+open_file(Path, _ReadAhead, file_handle_cache) ->
     % XXX ignore ReadAhead for now since not on file_handle_cache
     % TODO: see last opetions to open
     {ok, Handle} = file_handle_cache:open(Path, [raw, binary, read, append], []),
+    Handle;
+
+open_file(Path, _ReadAhead, file) ->
+    % XXX ignore ReadAhead for now since not on file_handle_cache
+    % TODO: see last opetions to open
+    {ok, Handle} = file:open(Path, [raw, binary, read, append]),
     Handle.
 
 % return the file handle to the current chunk, if not open already open it
@@ -141,12 +150,12 @@ offset_for_seqnum(#sblob{index=Idx}, SeqNum) ->
     Result.
 
 raw_get_next(Handle) ->
-     case file_handle_cache:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
+     case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
          {ok, Header} ->
 
              HeaderEntry = header_from_binary(Header),
              Len = HeaderEntry#sblob_entry.len,
-             {ok, Tail} = file_handle_cache:read(Handle, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
+             {ok, Tail} = file:read(Handle, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
              Data = binary:part(Tail, 0, Len),
              Entry = HeaderEntry#sblob_entry{data=Data,
                                              size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
@@ -252,7 +261,7 @@ seqread(Path, ChunkName, SeqNum, Count, Opts) ->
     lager:debug("seqread ~s ~p ~p", [ChunkName, SeqNum, Count]),
     SblobPath = filename:join([Path, ChunkName]),
     ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
-    Handle = open_file(SblobPath, ReadAhead),
+    Handle = open_file(SblobPath, ReadAhead, file),
     FoldFun = fun seqread_fold_fun/2,
     {_, AccOut}  = do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}),
     {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
@@ -261,7 +270,7 @@ seqread(Path, ChunkName, SeqNum, Count, Opts) ->
 do_fold(Handle, Fun, Acc0) ->
     case raw_get_next(Handle) of
         eof ->
-            file_handle_cache:close(Handle),
+            file:close(Handle),
             {eof, Acc0};
 
         Entry ->
@@ -270,7 +279,7 @@ do_fold(Handle, Fun, Acc0) ->
                     do_fold(Handle, Fun, Acc1);
 
                 {stop, _AccEnd}=Res -> 
-                    file_handle_cache:close(Handle),
+                    file:close(Handle),
                     Res
             end
     end.
@@ -284,7 +293,7 @@ do_fold(Handle, Fun, Acc0) ->
 fold(Path, ChunkName, Opts, Fun, Acc0) ->
     ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
     SblobPath = filename:join([Path, ChunkName]),
-    Handle = open_file(SblobPath, ReadAhead),
+    Handle = open_file(SblobPath, ReadAhead, file),
     do_fold(Handle, Fun, Acc0).
 
 % sub_file and remove_recursive adapted from 
