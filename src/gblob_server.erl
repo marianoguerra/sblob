@@ -1,8 +1,8 @@
 -module(gblob_server).
 -behaviour(gen_server).
 
--export([start_link/2, start_link/3, stop/1, put/2, put/3, get/2, get/3, status/1,
-        truncate/2, truncate_percentage/2, size/1]).
+-export([start_link/2, start_link/3, stop/1, put/2, put/3, put_cb/4, get/2,
+         get/3, status/1, truncate/2, truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
 
@@ -31,6 +31,9 @@ put(Pid, Data) ->
 
 put(Pid, Timestamp, Data) ->
     gen_server:call(Pid, {put, Timestamp, Data}).
+
+put_cb(Pid, Timestamp, Data, Callback) ->
+    gen_server:cast(Pid, {put, Timestamp, Data, Callback}).
 
 get(Pid, SeqNum) ->
     gen_server:call(Pid, {get, SeqNum}).
@@ -104,6 +107,9 @@ handle_call({truncate, SizeBytes}, _From, State=#state{gblob=Gblob}) ->
     NewState = update_gblob(State, NewGblob),
     {reply, Result, NewState, State#state.check_interval_ms}.
 
+handle_cast({put, Timestamp, Data, Callback}, State=#state{gblob=Gblob}) ->
+    server_put(Gblob, Timestamp, Data, State, Callback);
+
 handle_cast(Msg, State) ->
     io:format("Unexpected handle cast message: ~p~n",[Msg]),
     {noreply, State}.
@@ -159,12 +165,20 @@ check_eviction(Gblob=#gblob{path=Path},
         true -> State#state{last_eviction=NewEvictionTime}
     end.
 
-
-server_put(Gblob, Timestamp, Data, State) ->
+put_blob(Gblob, Timestamp, Data, State) ->
     {Gblob1, Entity} = gblob:put(Gblob, Timestamp, Data),
     NewState = update_gblob(State, Gblob1),
     timer:send_after(1, check_eviction),
+    {Entity, NewState}.
+
+server_put(Gblob, Timestamp, Data, State) ->
+    {Entity, NewState} = put_blob(Gblob, Timestamp, Data, State),
     {reply, Entity, NewState, NewState#state.check_interval_ms}.
+
+server_put(Gblob, Timestamp, Data, State, Callback) ->
+    {Entity, NewState} = put_blob(Gblob, Timestamp, Data, State),
+    Callback(Entity),
+    {noreply, NewState, NewState#state.check_interval_ms}.
 
 do_eviction(Gblob=#gblob{path=Path}) ->
     {MaybeEvictedGblob, EvictionResult} = gblob:check_eviction(Gblob),

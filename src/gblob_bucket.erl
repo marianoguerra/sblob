@@ -1,7 +1,7 @@
 -module(gblob_bucket).
 -behaviour(gen_server).
 
--export([start_link/3, stop/1, state/1, put/3, put/4, get/3, get/4,
+-export([start_link/3, stop/1, state/1, put/3, put/4, put_cb/5, get/3, get/4,
          truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -22,6 +22,9 @@ put(Pid, Id, Data) when is_binary(Id) ->
 
 put(Pid, Id, Timestamp, Data) when is_binary(Id) ->
     gen_server:call(Pid, {put, Id, Timestamp, Data}).
+
+put_cb(Pid, Id, Timestamp, Data, Callback) when is_binary(Id) ->
+    gen_server:cast(Pid, {put, Id, Timestamp, Data, Callback}).
 
 get(Pid, Id, SeqNum) when is_binary(Id) ->
     gen_server:call(Pid, {get, Id, SeqNum}).
@@ -88,6 +91,11 @@ handle_call(size, _From, State) ->
 
     {NewState, Result} = foldl_gblobs(State, GetSizes, {0, []}),
     {reply, Result, NewState}.
+
+handle_cast({put, Id, Timestamp, Data, Callback}, State) ->
+    {NewState, Gblob} = get_gblob(State, Id),
+    gblob_server:put_cb(Gblob, Timestamp, Data, Callback),
+    {noreply, NewState};
 
 handle_cast(Msg, State) ->
     io:format("Unexpected handle cast message: ~p~n",[Msg]),
