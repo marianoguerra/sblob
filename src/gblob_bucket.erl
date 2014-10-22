@@ -98,12 +98,18 @@ handle_call(size, _From, State) ->
 
 handle_cast({put, Id, Timestamp, Data, Callback}, State) ->
     {NewState, Gblob} = get_gblob(State, Id),
-    gblob_server:put_cb(Gblob, Timestamp, Data, Callback),
+    spawn(fun () ->
+                  Entity = gblob_server:put(Gblob, Timestamp, Data),
+                  Callback(Entity)
+          end),
     {noreply, NewState};
 
 handle_cast({get, Id, SeqNum, Count, Callback}, State) ->
     {NewState, Gblob} = get_gblob(State, Id),
-    gblob_server:get_cb(Gblob, SeqNum, Count, Callback),
+    spawn(fun () ->
+                  Entries = gblob_server:get(Gblob, SeqNum, Count),
+                  Callback(Entries)
+          end),
     {noreply, NewState};
 
 handle_cast(Msg, State) ->
