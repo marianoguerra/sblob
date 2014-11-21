@@ -325,8 +325,8 @@ nil_seqnum_returns_last(Gblob) ->
     Indexes = lists:seq(5, 14),
     Items = lists:zip(Indexes, Result),
     lists:map(fun ({I, Entity}) ->
-                      Data = num_to_data(I - 1),
-                      assert_entry(Entity, Data, I)
+                      Data = num_to_data(I),
+                      assert_entry(Entity, Data, I + 1)
               end, Items).
 
 open_test() ->

@@ -74,9 +74,9 @@ get(Gblob=#gblob{current=nil, path=Path}, SeqNum, Count) ->
 
 get(Gblob, nil, Count) ->
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
-    SeqNum = Sblob#sblob.seqnum - Count,
+    SeqNum = Sblob#sblob.seqnum - Count + 1,
 
-    SeqNum1 = if SeqNum < 0 -> 0;
+    SeqNum1 = if SeqNum < 1 -> 1;
                  true -> SeqNum
               end,
 
