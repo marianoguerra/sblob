@@ -170,6 +170,12 @@ evict(Path) ->
     sblob_util:remove(Path).
 
 % returns {RemovedSize, RemovedCount, Errors}
+run_eviction_plan({_, [], []}) ->
+    lager:warn("Empty eviction plan");
+run_eviction_plan({_, [], [#sblob_info{path=Path}|_]}) ->
+    % TODO: copy only last event if more than one
+    lager:info("Not removing stream completely ~s", [Path]),
+    {0, 0, []};
 run_eviction_plan({_, _ToKeep, ToRemove}) ->
     lists:foldl(fun (#sblob_info{path=Path, size=Size}, {CurSize, Count, Errors}) ->
                         NewErrors = try
