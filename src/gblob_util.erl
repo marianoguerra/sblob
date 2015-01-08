@@ -147,7 +147,7 @@ partition_by_size([#sblob_info{size=Size}=Stat|T], MaxSizeBytes, CurTotalSize,
                   ToKeep, ToRemove) ->
 
     NewCurTotalSize = CurTotalSize + Size,
-    
+
     if
         NewCurTotalSize > MaxSizeBytes ->
             NewToRemove = [Stat|ToRemove],
@@ -167,17 +167,12 @@ get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
     partition_by_size(Stats, MaxSizeBytes).
 
 evict(Path) ->
+    lager:info("Removing path ~p", [Path]),
     sblob_util:remove(Path).
 
 % returns {RemovedSize, RemovedCount, Errors}
-run_eviction_plan({_, [], []}) ->
-    lager:warn("Empty eviction plan"),
-    {0, 0, []};
-run_eviction_plan({_, [], [#sblob_info{path=Path}|_]}) ->
-    % TODO: copy only last event if more than one
-    lager:info("Not removing stream completely ~s", [Path]),
-    {0, 0, []};
-run_eviction_plan({_, _ToKeep, ToRemove}) ->
+run_eviction_plan({_, ToKeep, ToRemove}) ->
+    lager:info("run eviction plan keep ~p, remove ~p", [ToKeep, ToRemove]),
     lists:foldl(fun (#sblob_info{path=Path, size=Size}, {CurSize, Count, Errors}) ->
                         NewErrors = try
                                         evict(Path),
