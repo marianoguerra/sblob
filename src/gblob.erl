@@ -53,7 +53,7 @@ rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum, index=Index}=Gblob) ->
     NewChunkNum = ChunkNum + 1,
     #sblob{seqnum=LastSeqNum, fullpath=SblobPath} = Sblob1,
     NewPath = gblob_util:path_for_chunk_num(Gblob, NewChunkNum),
-    lager:info("rotating ~p to ~p", [SblobPath, NewPath]),
+    lager:debug("rotating ~p to ~p", [SblobPath, NewPath]),
     ok = file:rename(SblobPath, NewPath),
     NewIndex = sblob_idx:expand(Index, 1),
     Gblob1 = Gblob#gblob{max_chunk_num=NewChunkNum, current=nil, index=NewIndex},
