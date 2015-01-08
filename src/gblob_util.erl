@@ -171,7 +171,8 @@ evict(Path) ->
 
 % returns {RemovedSize, RemovedCount, Errors}
 run_eviction_plan({_, [], []}) ->
-    lager:warn("Empty eviction plan");
+    lager:warn("Empty eviction plan"),
+    {0, 0, []};
 run_eviction_plan({_, [], [#sblob_info{path=Path}|_]}) ->
     % TODO: copy only last event if more than one
     lager:info("Not removing stream completely ~s", [Path]),
