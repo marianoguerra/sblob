@@ -86,13 +86,15 @@ get(Gblob, nil, Count) ->
 get(Gblob, SeqNum, Count) ->
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
     BaseSeqNum = Sblob#sblob.base_seqnum,
-    SeqNumIsAfter = (SeqNum >= BaseSeqNum),
+    CurrentSblobSize = Sblob#sblob.size,
+    % TODO: see if the > is right
+    SeqNumIsAfter = (SeqNum > BaseSeqNum andalso CurrentSblobSize > 0),
     {Gblob2, Result} = if
         SeqNumIsAfter ->
            {Sblob1, Res} = sblob:get(Sblob, SeqNum, Count),
            {Gblob1#gblob{current=Sblob1}, Res};
         true ->
-            gblob_util:seqread(Gblob1, SeqNum, Count)
+           gblob_util:seqread(Gblob1, SeqNum, Count)
     end,
 
     {Gblob2, Result}.
