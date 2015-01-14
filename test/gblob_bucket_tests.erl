@@ -77,12 +77,12 @@ write_buckets_evict_get_size(Bucket) ->
     B5 = proplists:get_value(<<"b5">>, BucketSizes),
 
     % just check the numbers they return I didn't calculate the sizes hand
-    [?_assertEqual(246, TotalSize),
+    [?_assertEqual(546, TotalSize),
      ?_assertEqual(62, B1),
      ?_assertEqual(62, B2),
      ?_assertEqual(60, B3), % goes from 0 to 5 two times
      ?_assertEqual(62, B4),
-     ?_assertEqual(0, B5)].
+     ?_assertEqual(300, B5)].
 
 write_buckets_evict_write_get_size(Bucket) ->
     write_many(Bucket, <<"b1">>, 12),
@@ -109,10 +109,10 @@ write_buckets_evict_write_get_size(Bucket) ->
     B4 = proplists:get_value(<<"b4">>, BucketSizes),
     B5 = proplists:get_value(<<"b5">>, BucketSizes),
 
-    [?_assertEqual(1746, TotalSize),
-     ?_assertEqual(362, B1),
-     ?_assertEqual(362, B2),
-     ?_assertEqual(360, B3), % goes from 0 to 5 two times
-     ?_assertEqual(362, B4),
-     ?_assertEqual(300, B5)].
+    [?_assertEqual(2292, TotalSize),
+     ?_assertEqual(424, B1),
+     ?_assertEqual(424, B2),
+     ?_assertEqual(420, B3), % goes from 0 to 5 two times
+     ?_assertEqual(424, B4),
+     ?_assertEqual(600, B5)].
 

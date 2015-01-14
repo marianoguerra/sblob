@@ -34,14 +34,14 @@ put(Gblob, Data) ->
     put(Gblob, Now, Data).
 
 put(Gblob, Timestamp, Data) ->
-    {Gblob1, Sblob} = gblob_util:get_current(Gblob),
-    {Sblob1, Entry} = sblob:put(Sblob, Timestamp, Data),
-    Gblob2 = Gblob1#gblob{current=Sblob1},
-    ShouldRotate = gblob_util:should_rotate(Gblob2),
-    Gblob3 = if
-        ShouldRotate -> rotate(Gblob2);
-        true -> Gblob2
+    ShouldRotate = gblob_util:should_rotate(Gblob),
+    Gblob1 = if
+        ShouldRotate -> rotate(Gblob);
+        true -> Gblob
     end,
+    {Gblob2, Sblob} = gblob_util:get_current(Gblob1),
+    {Sblob1, Entry} = sblob:put(Sblob, Timestamp, Data),
+    Gblob3 = Gblob2#gblob{current=Sblob1},
     {Gblob3, Entry}.
 
 rotate(#gblob{index=nil}=Gblob) ->

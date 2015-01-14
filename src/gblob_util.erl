@@ -10,6 +10,7 @@
          run_eviction_plan/1,
          log_eviction_results/2,
          get_blobs_info/1,
+         get_blobs_eviction_info/1,
          get_index/1,
          get_blob_indexes_from_list/1, get_blob_indexes/1,
          get_blob_index_limits/1]).
@@ -131,10 +132,15 @@ get_blobs_info(BasePath) ->
     Indexes = get_blob_indexes(BasePath),
     Fun = fun (Index) -> get_blob_info_by_index(Index, BasePath) end,
     SblobsWithIndex = lists:map(Fun, Indexes),
-    BlobStats = lists:reverse(SblobsWithIndex),
+    CurrentStats = sblob_util:get_blob_info(BasePath, "sblob", 0),
+    BlobStats = [CurrentStats|lists:reverse(SblobsWithIndex)],
     SumSizes = fun (#sblob_info{size=Size}, CurSize) -> CurSize + Size end,
     TotalSize = lists:foldl(SumSizes, 0, BlobStats),
     {TotalSize, BlobStats}.
+
+get_blobs_eviction_info(BasePath) ->
+    {TotalSize, [#sblob_info{size=CurrentSize}|Stats]} = get_blobs_info(BasePath),
+    {TotalSize - CurrentSize, Stats}.
 
 partition_by_size(Stats, MaxSizeBytes) ->
     partition_by_size(Stats, MaxSizeBytes, 0, [], []).
@@ -157,12 +163,13 @@ partition_by_size([#sblob_info{size=Size}=Stat|T], MaxSizeBytes, CurTotalSize,
     end.
 
 get_eviction_plan_for_current_size_percent(BasePath, CurSizePercentage) when CurSizePercentage =< 1 ->
-    {TotalSize, Stats} = get_blobs_info(BasePath),
+
+    {TotalSize, Stats} = get_blobs_eviction_info(BasePath),
     MaxSizeBytes = round(TotalSize * CurSizePercentage),
     partition_by_size(Stats, MaxSizeBytes).
 
 get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
-    {_TotalSize, Stats} = get_blobs_info(BasePath),
+    {_TotalSize, Stats} = get_blobs_eviction_info(BasePath),
     partition_by_size(Stats, MaxSizeBytes).
 
 evict(Path) ->
@@ -200,6 +207,7 @@ log_eviction_results(Path, {RemovedSize, RemovedCount, Errors}) ->
     lists:foreach(fun log_eviction_error/1, Errors),
     ok.
 
+should_rotate(#gblob{current=nil}) -> false;
 should_rotate(#gblob{current=Sblob, config=Config}) ->
     #sblob_stats{size=SblobSize, count=SblobCount} = sblob:stats(Sblob),
     #gblob_cfg{max_items=MaxItems, max_size_bytes=MaxSizeBytes} = Config,

@@ -103,7 +103,8 @@ write_100_truncate(Gblob) ->
     TruncateResult = gblob_server:truncate(Gblob, 0),
     ?debugVal(TruncateResult),
     Result = gblob_server:get(Gblob, 91, 10),
-    [?_assertEqual([], Result)].
+    % it keeps the current sblob
+    [?_assertEqual(9, length(Result))].
 
 write_100_truncate_half(Gblob) ->
     write_many(Gblob, 99),

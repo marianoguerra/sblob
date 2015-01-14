@@ -212,26 +212,26 @@ write_42_get_stats(Gblob=#gblob{path=Path}) ->
 
 write_42_evict_by_size(Gblob=#gblob{path=Path}) ->
     _Gblob1 = write_many(Gblob, 42),
-    {StatsTotalSize, Stats} = gblob_util:get_blobs_info(Path),
+    {StatsTotalSize, Stats} = gblob_util:get_blobs_eviction_info(Path),
     FirstSize = 62,
     SecondSize = 300,
     OthersSize = 310,
-    TotalSize = 1292,
+    TotalSize = 1230,
 
-    E0 = {0, FirstSize, "sblob"},
+    %E0 = {0, FirstSize, "sblob"},
     E1 = {1, SecondSize, "sblob.1"},
     E2 = {2, OthersSize, "sblob.2"},
     E3 = {3, OthersSize, "sblob.3"},
     E4 = {4, OthersSize, "sblob.4"},
 
     EvictionTests = [check_eviction_size(Path, 0, TotalSize, [],
-                                         [E0, E4, E3, E2, E1]),
-                     check_eviction_size(Path, FirstSize, TotalSize, [E0],
+                                         [E4, E3, E2, E1]),
+                     check_eviction_size(Path, FirstSize, TotalSize, [],
                                          [E4, E3, E2, E1]),
                      check_eviction_size(Path, FirstSize + SecondSize + 150,
-                                         TotalSize, [E0, E4], [E3, E2, E1]),
+                                         TotalSize, [E4], [E3, E2, E1]),
                      check_eviction_size(Path, TotalSize, TotalSize,
-                                         [E0, E4, E3, E2, E1], [])],
+                                         [E4, E3, E2, E1], [])],
 
     ExistBefore = lists:all(fun sblob_exists/1, Stats),
     Plan = gblob_util:get_eviction_plan_for_size_limit(Path, 0),
@@ -240,37 +240,37 @@ write_42_evict_by_size(Gblob=#gblob{path=Path}) ->
 
     % Test eviction plan here to avoid writting again
 
-    [?_assertEqual(5, length(Stats)),
+    [?_assertEqual(4, length(Stats)),
      ?_assertEqual(TotalSize, StatsTotalSize),
      ?_assertEqual(true, ExistBefore),
      ?_assertEqual(false, RemovedAfter),
      ?_assertEqual(TotalSize, RemSize),
-     ?_assertEqual(5, RemCount),
+     ?_assertEqual(4, RemCount),
      ?_assertEqual([], RemErrors),
      EvictionTests].
 
 write_42_evict_by_current_size_percent(Gblob=#gblob{path=Path}) ->
     _Gblob1 = write_many(Gblob, 42),
-    {StatsTotalSize, Stats} = gblob_util:get_blobs_info(Path),
-    FirstSize = 62,
+    {StatsTotalSize, Stats} = gblob_util:get_blobs_eviction_info(Path),
+    %FirstSize = 62,
     SecondSize = 300,
     OthersSize = 310,
-    TotalSize = 1292,
+    TotalSize = 1230,
 
-    E0 = {0, FirstSize, "sblob"},
+    %E0 = {0, FirstSize, "sblob"},
     E1 = {1, SecondSize, "sblob.1"},
     E2 = {2, OthersSize, "sblob.2"},
     E3 = {3, OthersSize, "sblob.3"},
     E4 = {4, OthersSize, "sblob.4"},
 
     EvictionTests = [check_eviction_perc(Path, 0, TotalSize, [],
-                                         [E0, E4, E3, E2, E1]),
+                                         [E4, E3, E2, E1]),
                      check_eviction_perc(Path, 1, TotalSize,
-                                         [E0, E4, E3, E2, E1], []),
+                                         [E4, E3, E2, E1], []),
                      check_eviction_perc(Path, 0.5, TotalSize,
-                                         [E0, E4], [E3, E2, E1]),
+                                         [E4], [E3, E2, E1]),
                      check_eviction_perc(Path, 0.9, TotalSize,
-                                         [E0, E4, E3, E2], [E1])],
+                                         [E4, E3, E2], [E1])],
 
     ExistBefore = lists:all(fun sblob_exists/1, Stats),
     Plan = gblob_util:get_eviction_plan_for_current_size_percent(Path, 0.5),
@@ -279,10 +279,10 @@ write_42_evict_by_current_size_percent(Gblob=#gblob{path=Path}) ->
 
     % Test eviction plan here to avoid writting again
 
-    [?_assertEqual(5, length(Stats)),
+    [?_assertEqual(4, length(Stats)),
      ?_assertEqual(TotalSize, StatsTotalSize),
      ?_assertEqual(true, ExistBefore),
-     ?_assertEqual([true, true, false, false, false], RemovedAfter),
+     ?_assertEqual([true, false, false, false], RemovedAfter),
      ?_assertEqual(920, RemSize),
      ?_assertEqual(3, RemCount),
      ?_assertEqual([], RemErrors),
