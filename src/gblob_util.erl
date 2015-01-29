@@ -200,14 +200,13 @@ log_eviction_results(Path, {RemovedSize, RemovedCount, Errors}) ->
     Msg = "run eviction on ~s, removed ~p blobs (~p bytes) with ~p errors",
     Args = [Path, RemovedCount, RemovedSize, length(Errors)],
 
-    if RemovedSize > 0 -> lager:info(Msg, Args);
+    if RemovedSize > 0 -> lager:debug(Msg, Args);
        true -> lager:debug(Msg, Args)
     end,
 
     lists:foreach(fun log_eviction_error/1, Errors),
     ok.
 
-should_rotate(#gblob{current=nil}) -> false;
 should_rotate(#gblob{current=Sblob, config=Config}) ->
     #sblob_stats{size=SblobSize, count=SblobCount} = sblob:stats(Sblob),
     #gblob_cfg{max_items=MaxItems, max_size_bytes=MaxSizeBytes} = Config,

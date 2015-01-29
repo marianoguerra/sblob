@@ -12,6 +12,7 @@ usage_test_() ->
      [fun do_nothing/1,
       fun only_reopen/1,
       fun write_100/1,
+      fun write_more_than_max_items/1,
       fun write_100_read_1/1,
       fun write_100_read_100/1,
       fun write_100_read_first_50/1,
@@ -76,6 +77,23 @@ write_100(Gblob) ->
      assert_entry(E7, <<"item 96">>, 97),
      assert_entry(E8, <<"item 97">>, 98),
      assert_entry(E9, <<"item 98">>, 99)].
+
+write_more_than_max_items(_Gblob) ->
+    Path = io_lib:format("gblob-~p", [sblob_util:now()]),
+    Offset = 0,
+    Count = ?SBLOB_DEFAULT_MAX_ITEMS + 2,
+    lists:foldl(fun (I, _State) ->
+                        Gblob = gblob:open(Path, []),
+                        Data = num_to_data(I),
+                        {GblobOut, _} = gblob:put(Gblob, Data),
+                        gblob:close(GblobOut),
+                        nil
+               end, nil, lists:seq(Offset, Offset + Count - 1)),
+
+    Gblob1 = gblob:open(Path, []),
+    {Gblob2, E1} = gblob:get(Gblob1, Count - 1),
+    gblob:delete(Gblob2),
+    [assert_entry(E1, <<"item 4096">>, 4097)].
 
 write_100_read_1(Gblob) ->
     Gblob1 = write_many(Gblob, 100),

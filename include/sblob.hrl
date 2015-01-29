@@ -1,8 +1,9 @@
 -define(SBLOB_DEFAULT_READ_AHEAD, 65536).
+-define(SBLOB_DEFAULT_MAX_ITEMS, 4096).
 
 -record(sblob_cfg, {
           read_ahead= ?SBLOB_DEFAULT_READ_AHEAD, % see file:open read_ahead opton
-          max_items=4096,
+          max_items=?SBLOB_DEFAULT_MAX_ITEMS,
           base_seqnum=0}).
 
 -record(sblob, {

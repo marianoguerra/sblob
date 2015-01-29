@@ -33,6 +33,9 @@ put(Gblob, Data) ->
     Now = sblob_util:now(),
     put(Gblob, Now, Data).
 
+put(#gblob{current=nil}=Gblob, Timestamp, Data) ->
+    {Gblob1, _Sblob} = gblob_util:get_current(Gblob),
+    put(Gblob1, Timestamp, Data);
 put(Gblob, Timestamp, Data) ->
     ShouldRotate = gblob_util:should_rotate(Gblob),
     Gblob1 = if
