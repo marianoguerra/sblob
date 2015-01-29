@@ -173,13 +173,13 @@ get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
     partition_by_size(Stats, MaxSizeBytes).
 
 evict(Path) ->
-    lager:info("Removing path ~p", [Path]),
+    lager:debug("Removing path ~p", [Path]),
     sblob_util:remove(Path).
 
 % returns {RemovedSize, RemovedCount, Errors}
 run_eviction_plan({_, ToKeep, ToRemove}) ->
     if length(ToRemove) > 0 ->
-           lager:info("run eviction plan keep ~p, remove ~p", [ToKeep, ToRemove]);
+           lager:debug("run eviction plan keep ~p, remove ~p", [ToKeep, ToRemove]);
        true -> ok
     end,
     lists:foldl(fun (#sblob_info{path=Path, size=Size}, {CurSize, Count, Errors}) ->
