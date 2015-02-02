@@ -11,6 +11,7 @@ usage_test_() ->
      fun usage_stop/1,
      [fun do_nothing/1,
       fun only_reopen/1,
+      fun write_expect_last_seqnum/1,
       fun write_100/1,
       fun write_more_than_max_items/1,
       fun write_100_read_1/1,
@@ -77,6 +78,14 @@ write_100(Gblob) ->
      assert_entry(E7, <<"item 96">>, 97),
      assert_entry(E8, <<"item 97">>, 98),
      assert_entry(E9, <<"item 98">>, 99)].
+
+write_expect_last_seqnum(Gblob) ->
+    Timestamp = 42,
+    Data = <<"hi there">>,
+    {Gblob1, #sblob_entry{seqnum=LastSeqnum}} = gblob:put(Gblob, Timestamp, Data),
+    {Gblob2, #sblob_entry{seqnum=LastSeqnum1}} = gblob:put(Gblob1, Timestamp, Data, LastSeqnum),
+    {error, Reason, _Gblob3} = gblob:put(Gblob2, Timestamp, Data, LastSeqnum),
+    [?_assertEqual({conflict, {seqnum, LastSeqnum1, expected, LastSeqnum}}, Reason)].
 
 write_more_than_max_items(_Gblob) ->
     Path = io_lib:format("gblob-~p", [sblob_util:now()]),

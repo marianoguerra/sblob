@@ -1,6 +1,6 @@
 -module(gblob).
 
--export([open/2, close/1, delete/1, put/2, put/3, get/2, get/3,
+-export([open/2, close/1, delete/1, put/2, put/3, put/4, get/2, get/3,
          check_eviction/1, truncate/2, truncate_percentage/2, size/1]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -46,6 +46,15 @@ put(Gblob, Timestamp, Data) ->
     {Sblob1, Entry} = sblob:put(Sblob, Timestamp, Data),
     Gblob3 = Gblob2#gblob{current=Sblob1},
     {Gblob3, Entry}.
+
+put(#gblob{current=nil}=Gblob, Timestamp, Data, LastSeqNum) ->
+    {Gblob1, _Sblob} = gblob_util:get_current(Gblob),
+    put(Gblob1, Timestamp, Data, LastSeqNum);
+put(#gblob{current=#sblob{seqnum=LastSeqNum}}=Gblob, Timestamp, Data, LastSeqNum) ->
+    put(Gblob, Timestamp, Data);
+put(#gblob{current=#sblob{seqnum=SeqNum}}=Gblob, _Timestamp, _Data, LastSeqNum) ->
+    Reason = {conflict, {seqnum, SeqNum, expected, LastSeqNum}},
+    {error, Reason, Gblob}.
 
 rotate(#gblob{index=nil}=Gblob) ->
     {GblobWithIndex, _Index} = gblob_util:get_index(Gblob),

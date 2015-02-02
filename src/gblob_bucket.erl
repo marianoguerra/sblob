@@ -1,7 +1,7 @@
 -module(gblob_bucket).
 -behaviour(gen_server).
 
--export([start_link/3, stop/1, state/1, put/3, put/4, put_cb/5,
+-export([start_link/3, stop/1, state/1, put/3, put/4, put_cb/5, put_cb/6,
          get/3, get/4, get_cb/5,
          truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
@@ -26,6 +26,9 @@ put(Pid, Id, Timestamp, Data) when is_binary(Id) ->
 
 put_cb(Pid, Id, Timestamp, Data, Callback) when is_binary(Id) ->
     gen_server:cast(Pid, {put, Id, Timestamp, Data, Callback}).
+
+put_cb(Pid, Id, Timestamp, Data, LastSeqNum, Callback) when is_binary(Id) ->
+    gen_server:cast(Pid, {put, Id, Timestamp, Data, LastSeqNum, Callback}).
 
 get(Pid, Id, SeqNum) when is_binary(Id) ->
     gen_server:call(Pid, {get, Id, SeqNum}).
@@ -101,6 +104,14 @@ handle_cast({put, Id, Timestamp, Data, Callback}, State) ->
     spawn(fun () ->
                   Entity = gblob_server:put(Gblob, Timestamp, Data),
                   Callback(Entity)
+          end),
+    {noreply, NewState};
+
+handle_cast({put, Id, Timestamp, Data, LastSeqNum, Callback}, State) ->
+    {NewState, Gblob} = get_gblob(State, Id),
+    spawn(fun () ->
+                  Reply = gblob_server:put(Gblob, Timestamp, Data, LastSeqNum),
+                  Callback(Reply)
           end),
     {noreply, NewState};
 

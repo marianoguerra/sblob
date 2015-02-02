@@ -10,6 +10,7 @@ usage_test_() ->
      fun usage_start/0,
      fun usage_stop/1,
      [fun do_nothing/1,
+      fun write_expect_last_seqnum/1,
       fun write_100/1,
       fun write_100_get_size/1,
       fun write_100_truncate/1,
@@ -79,6 +80,14 @@ write_many(Gblob, Count) ->
                        Data = num_to_data(I),
                        gblob_server:put(Gblob, Data)
                end, lists:seq(0, Count - 1)).
+
+write_expect_last_seqnum(Gblob) ->
+    Timestamp = 42,
+    Data = <<"hi there">>,
+    #sblob_entry{seqnum=LastSeqnum} = gblob_server:put(Gblob, Timestamp, Data),
+    #sblob_entry{seqnum=LastSeqnum1} = gblob_server:put(Gblob, Timestamp, Data, LastSeqnum),
+    {error, Reason} = gblob_server:put(Gblob, Timestamp, Data, LastSeqnum),
+    [?_assertEqual({conflict, {seqnum, LastSeqnum1, expected, LastSeqnum}}, Reason)].
 
 write_100(Gblob) ->
     write_many(Gblob, 99),

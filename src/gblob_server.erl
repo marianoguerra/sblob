@@ -1,7 +1,7 @@
 -module(gblob_server).
 -behaviour(gen_server).
 
--export([start_link/2, start_link/3, stop/1, put/2, put/3,
+-export([start_link/2, start_link/3, stop/1, put/2, put/3, put/4,
          get/2, get/3, status/1, truncate/2, truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -31,6 +31,9 @@ put(Pid, Data) ->
 
 put(Pid, Timestamp, Data) ->
     gen_server:call(Pid, {put, Timestamp, Data}).
+
+put(Pid, Timestamp, Data, LastSeqNum) ->
+    gen_server:call(Pid, {put, Timestamp, Data, LastSeqNum}).
 
 get(Pid, SeqNum) ->
     gen_server:call(Pid, {get, SeqNum}).
@@ -73,10 +76,13 @@ handle_call(status, _From, State=#state{active=Active,
 
 handle_call({put, Data}, _From, State=#state{gblob=Gblob}) ->
     Timestamp = sblob_util:now(),
-    server_put(Gblob, Timestamp, Data, State);
+    server_put(Gblob, Timestamp, Data, nil, State);
 
 handle_call({put, Timestamp, Data}, _From, State=#state{gblob=Gblob}) ->
-    server_put(Gblob, Timestamp, Data, State);
+    server_put(Gblob, Timestamp, Data, nil, State);
+
+handle_call({put, Timestamp, Data, LastSeqNum}, _From, State=#state{gblob=Gblob}) ->
+    server_put(Gblob, Timestamp, Data, LastSeqNum, State);
 
 handle_call({get, SeqNum}, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Result} = gblob:get(Gblob, SeqNum),
@@ -159,15 +165,20 @@ check_eviction(Gblob=#gblob{path=Path},
         true -> State#state{last_eviction=NewEvictionTime}
     end.
 
-put_blob(Gblob, Timestamp, Data, State) ->
-    {Gblob1, Entity} = gblob:put(Gblob, Timestamp, Data),
+put_blob(Gblob, Timestamp, Data, nil) ->
+    gblob:put(Gblob, Timestamp, Data);
+put_blob(Gblob, Timestamp, Data, LastSeqNum) ->
+    case gblob:put(Gblob, Timestamp, Data, LastSeqNum) of
+        {error, Reason, NewGblob} ->
+            {NewGblob, {error, Reason}};
+        Other -> Other
+    end.
+
+server_put(Gblob, Timestamp, Data, LastSeqNum, State) ->
+    {Gblob1, Reply} = put_blob(Gblob, Timestamp, Data, LastSeqNum),
     NewState = update_gblob(State, Gblob1),
     timer:send_after(1, check_eviction),
-    {Entity, NewState}.
-
-server_put(Gblob, Timestamp, Data, State) ->
-    {Entity, NewState} = put_blob(Gblob, Timestamp, Data, State),
-    {reply, Entity, NewState, NewState#state.check_interval_ms}.
+    {reply, Reply, NewState, NewState#state.check_interval_ms}.
 
 do_eviction(Gblob=#gblob{path=Path}) ->
     {MaybeEvictedGblob, EvictionResult} = gblob:check_eviction(Gblob),

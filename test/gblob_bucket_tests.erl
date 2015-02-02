@@ -1,6 +1,8 @@
 -module(gblob_bucket_tests).
 -include_lib("eunit/include/eunit.hrl").
 
+-include("sblob.hrl").
+
 usage_test_() ->
     file_handle_cache:start_link(),
     ?debugMsg("starting gblob bucket usage tests"),
@@ -8,6 +10,7 @@ usage_test_() ->
      fun usage_start/0,
      fun usage_stop/1,
      [fun do_nothing/1,
+      fun write_expect_last_seqnum/1,
       fun write_buckets_get_size/1,
       fun write_buckets_evict_get_size/1,
       fun write_buckets_evict_write_get_size/1
@@ -35,6 +38,32 @@ write_many(Bucket, Id, Count) ->
                end, lists:seq(0, Count - 1)).
 
 do_nothing(_Bucket) -> [].
+
+write_expect_last_seqnum(Bucket) ->
+    Id = <<"mystream">>,
+    Timestamp = 42,
+    Data = <<"hi there">>,
+
+    Self = self(),
+
+    Cb3 = fun(Error) -> Self ! Error end,
+
+
+    Cb1 = fun (#sblob_entry{seqnum=LastSeqnum}) ->
+                  ?assertEqual(1, LastSeqnum),
+                  Cb2 = fun (#sblob_entry{seqnum=LastSeqnum1}) ->
+                                ?assertEqual(2, LastSeqnum1),
+                                gblob_bucket:put_cb(Bucket, Id, Timestamp, Data,
+                                                 LastSeqnum, Cb3)
+                        end,
+
+                  gblob_bucket:put_cb(Bucket, Id, Timestamp, Data, LastSeqnum, Cb2)
+          end,
+
+    gblob_bucket:put_cb(Bucket, Id, Timestamp, Data, Cb1),
+
+    Error = receive X -> X after 1000 -> timeout end,
+    [?_assertEqual({error, {conflict, {seqnum, 2, expected, 1}}}, Error)].
 
 write_buckets_get_size(Bucket) ->
     write_many(Bucket, <<"b1">>, 12),
