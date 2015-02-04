@@ -1,7 +1,7 @@
 -module(gblob_bucket).
 -behaviour(gen_server).
 
--export([start_link/3, stop/1, state/1, put/3, put/4, put_cb/5, put_cb/6,
+-export([start_link/3, stop/1, state/1, put/3, put/4, put/5, put_cb/5, put_cb/6,
          get/3, get/4, get_cb/5,
          truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
@@ -23,6 +23,9 @@ put(Pid, Id, Data) when is_binary(Id) ->
 
 put(Pid, Id, Timestamp, Data) when is_binary(Id) ->
     gen_server:call(Pid, {put, Id, Timestamp, Data}).
+
+put(Pid, Id, Timestamp, Data, LastSeqNum) when is_binary(Id) ->
+    gen_server:call(Pid, {put, Id, Timestamp, Data, LastSeqNum}).
 
 put_cb(Pid, Id, Timestamp, Data, Callback) when is_binary(Id) ->
     gen_server:cast(Pid, {put, Id, Timestamp, Data, Callback}).
@@ -74,6 +77,9 @@ handle_call({put, Id, Data}, _From, State) ->
 
 handle_call({put, Id, Timestamp, Data}, _From, State) ->
     with_gblob(State, Id, fun(Gblob) -> gblob_server:put(Gblob, Timestamp, Data) end);
+
+handle_call({put, Id, Timestamp, Data, LastSeqNum}, _From, State) ->
+    with_gblob(State, Id, fun(Gblob) -> gblob_server:put(Gblob, Timestamp, Data, LastSeqNum) end);
 
 handle_call({get, Id, SeqNum}, _From, State) ->
     with_gblob(State, Id, fun(Gblob) -> gblob_server:get(Gblob, SeqNum) end);
