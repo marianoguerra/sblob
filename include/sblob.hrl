@@ -62,3 +62,10 @@
 -define(SBLOB_HEADER_SIZE_BYTES, 20).
 -define(SBLOB_HEADER_LEN_SIZE_BITS, 32).
 -define(SBLOB_HEADER_LEN_SIZE_BYTES, 4).
+
+-define(SBLOB_OPEN(Path, Opts1, Opts2), file_handle_cache:open(Path, Opts1, Opts2)).
+-define(SBLOB_FILE, file_handle_cache).
+-define(SBLOB_APPEND, file_handle_cache:append).
+%-define(SBLOB_OPEN(Path, Opts1, Opts2), file:open(Path, Opts1)).
+%-define(SBLOB_FILE, file).
+%-define(SBLOB_APPEND, file:write).

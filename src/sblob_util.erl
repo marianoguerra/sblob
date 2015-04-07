@@ -44,7 +44,7 @@ open_file(Path, _ReadAhead) ->
 open_file(Path, _ReadAhead, file_handle_cache) ->
     % XXX ignore ReadAhead for now since not on file_handle_cache
     % TODO: see last opetions to open
-    {ok, Handle} = file_handle_cache:open(Path, [raw, binary, read, append], []),
+    {ok, Handle} = ?SBLOB_OPEN(Path, [raw, binary, read, append], []),
     Handle;
 
 open_file(Path, _ReadAhead, file) ->
@@ -59,7 +59,7 @@ get_handle(#sblob{fullpath=FullPath, handle=nil,
                   config=#sblob_cfg{read_ahead=ReadAhead}}=Sblob) ->
     lager:debug("get handle ~s", [FullPath]),
     Handle = open_file(FullPath, ReadAhead),
-    {ok, Size} = file_handle_cache:position(Handle, eof),
+    {ok, Size} = ?SBLOB_FILE:position(Handle, eof),
     {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}};
 
 get_handle(#sblob{handle=Handle}=Sblob) ->
@@ -72,7 +72,7 @@ seek(#sblob{handle=nil}=Sblob, Location) ->
     seek(Sblob1, Location);
 seek(#sblob{handle=Handle, name=Name}=Sblob, Location) ->
     lager:debug("seek ~s ~p", [Name, Location]),
-    {ok, NewPos} = file_handle_cache:position(Handle, Location),
+    {ok, NewPos} = ?SBLOB_FILE:position(Handle, Location),
     Sblob#sblob{position=NewPos}.
 
 seek_to_seqnum(Sblob, SeqNum) ->
@@ -81,7 +81,7 @@ seek_to_seqnum(Sblob, SeqNum) ->
         notfound -> {nil, 0};
         Result -> Result
     end,
-    {ok, NewPos} = file_handle_cache:position(Handle, {bof, Offset}),
+    {ok, NewPos} = ?SBLOB_FILE:position(Handle, {bof, Offset}),
     {OffsetKey, NewSblob#sblob{position=NewPos}}.
 
 fill_bounds(#sblob{name=Name}=Sblob) ->
@@ -110,7 +110,7 @@ read(#sblob{handle=nil}=Sblob, Len) ->
     read(NewSblob, Len);
 
 read(#sblob{position=Pos, handle=Handle}=Sblob, Len) ->
-    {Sblob#sblob{position=Pos + Len}, file_handle_cache:read(Handle, Len)}.
+    {Sblob#sblob{position=Pos + Len}, ?SBLOB_FILE:read(Handle, Len)}.
 
 to_binary(#sblob_entry{timestamp=Timestamp, seqnum=SeqNum, data=Data}) ->
     to_binary(Timestamp, SeqNum, Data).
