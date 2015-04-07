@@ -21,7 +21,9 @@ usage_test_() ->
       fun write_100_read_middle_50/1,
       fun write_100_read_last_50/1,
       fun write_100_read_some_50/1,
-      fun write_100_read_some/1
+      fun write_100_read_some/1,
+
+      fun gblob_triq/1
      ]}.
 
 new_gblob_server(ServerOpts) ->
@@ -178,3 +180,5 @@ assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
      ?_assertEqual(ESeqNum, SeqNum),
      ?_assertEqual(size(Data), Len)].
 
+gblob_triq(_Gblob) ->
+    ?assertEqual(true, triq:check(gblob_triq:gblob_props())).
