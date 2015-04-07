@@ -13,6 +13,7 @@
 
 -include_lib("kernel/include/file.hrl").
 
+% XXX why do we use now() if we then divide by 1000?
 now() ->
     {Mega, Sec, Micro} = erlang:now(),
     ((Mega * 1000000 + Sec) * 1000000 + Micro) div 1000.

@@ -186,7 +186,6 @@ do_eviction(Gblob=#gblob{path=Path}) ->
     MaybeEvictedGblob.
 
 do_check(State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=CheckIntervalMs}) ->
-    Path = Gblob#gblob.path,
 
     Now = sblob_util:now_fast(),
     LastCheckTime = Now - CheckIntervalMs,
@@ -194,7 +193,8 @@ do_check(State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=Che
 
     {NewActive, NewGblob} = if
                                 ShouldClose ->
-                                    lager:info("closing inactive gblob ~s", [Path]),
+                                    %Path = Gblob#gblob.path,
+                                    %lager:info("closing inactive gblob ~s", [Path]),
                                     {false, gblob:close(Gblob)};
                                 true ->
                                     {true, Gblob}
