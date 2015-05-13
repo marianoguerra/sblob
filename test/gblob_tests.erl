@@ -12,6 +12,10 @@ usage_test_() ->
      [fun do_nothing/1,
       fun only_reopen/1,
       fun write_expect_last_seqnum/1,
+      fun write_100_empty_blobs/1,
+      fun write_100_1_byte_blobs/1,
+      fun write_10000_empty_blobs/1,
+      fun write_10000_1_byte_blobs/1,
       fun write_100/1,
       fun write_more_than_max_items/1,
       fun write_100_read_1/1,
@@ -78,6 +82,60 @@ write_100(Gblob) ->
      assert_entry(E7, <<"item 96">>, 97),
      assert_entry(E8, <<"item 97">>, 98),
      assert_entry(E9, <<"item 98">>, 99)].
+
+write_100_empty_blobs(Gblob) ->
+    Gblob1 = lists:foldl(fun (_I, GblobIn) ->
+                                 {GblobOut, _} = gblob:put(GblobIn, <<"">>),
+                                 GblobOut
+                end, Gblob, lists:seq(1, 100)),
+    {_Gblob2, Entries} = gblob:get(Gblob1, 91, 10),
+    ?assertEqual(10, length(Entries)),
+    [E1, E2, E3, E4, E5, E6, E7, E8, E9, E10] = Entries,
+    [assert_entry(E1, <<"">>, 91),
+     assert_entry(E2, <<"">>, 92),
+     assert_entry(E3, <<"">>, 93),
+     assert_entry(E4, <<"">>, 94),
+     assert_entry(E5, <<"">>, 95),
+     assert_entry(E6, <<"">>, 96),
+     assert_entry(E7, <<"">>, 97),
+     assert_entry(E8, <<"">>, 98),
+     assert_entry(E9, <<"">>, 99),
+     assert_entry(E10, <<"">>, 100)].
+
+
+write_10000_empty_blobs(Gblob) ->
+    lists:foldl(fun (_I, GblobIn) ->
+                                 {GblobOut, _} = gblob:put(GblobIn, <<"">>),
+                                 GblobOut
+                end, Gblob, lists:seq(1, 10000)),
+    [?_assertEqual(true, true)].
+
+write_10000_1_byte_blobs(Gblob) ->
+    lists:foldl(fun (_I, GblobIn) ->
+                                 {GblobOut, _} = gblob:put(GblobIn, <<"b">>),
+                                 GblobOut
+                end, Gblob, lists:seq(1, 10000)),
+    [?_assertEqual(true, true)].
+
+
+write_100_1_byte_blobs(Gblob) ->
+    Gblob1 = lists:foldl(fun (_I, GblobIn) ->
+                                 {GblobOut, _} = gblob:put(GblobIn, <<"b">>),
+                                 GblobOut
+                end, Gblob, lists:seq(1, 100)),
+    {_Gblob2, Entries} = gblob:get(Gblob1, 91, 10),
+    ?assertEqual(10, length(Entries)),
+    [E1, E2, E3, E4, E5, E6, E7, E8, E9, E10] = Entries,
+    [assert_entry(E1, <<"b">>, 91),
+     assert_entry(E2, <<"b">>, 92),
+     assert_entry(E3, <<"b">>, 93),
+     assert_entry(E4, <<"b">>, 94),
+     assert_entry(E5, <<"b">>, 95),
+     assert_entry(E6, <<"b">>, 96),
+     assert_entry(E7, <<"b">>, 97),
+     assert_entry(E8, <<"b">>, 98),
+     assert_entry(E9, <<"b">>, 99),
+     assert_entry(E10, <<"b">>, 100)].
 
 write_expect_last_seqnum(Gblob) ->
     Timestamp = 42,
