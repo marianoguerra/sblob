@@ -51,6 +51,14 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size, name=Name}=Sblob, Timestamp, D
     NewSeqNum = SeqNum + 1,
     lager:debug("put ~s ~p ~p", [Name, NewSeqNum, Timestamp]),
     Blob = sblob_util:to_binary(Timestamp, NewSeqNum, Data),
+    AllZerosBlob = <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0>>,
+
+    if Blob == AllZerosBlob ->
+           lager:warning("writing corrupt entry sblob: ~p sblob1: ~p seqnum: ~p, newseqnum: ~p, timestamp ~p data ~p",
+                         [lager:pr(Sblob), lager:pr(Sblob1), SeqNum, NewSeqNum, Timestamp, Data]),
+           throw(corrupted_entry);
+       true -> ok
+    end,
     ok = file_handle_cache:append(Handle, Blob),
 
     EntryOffset = Size,
