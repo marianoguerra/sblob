@@ -4,3 +4,7 @@ notes.txt
 .deps_plt
 deps
 log
+test/*.beam
+scratch.erl
+scratch
+.rebar
