@@ -18,11 +18,5 @@ ifeq ($(REBAR),)
 $(error "Rebar not available on this system")
 endif
 
-.PHONY: eunit 
-
-eunit: app
-	ERL_AFLAGS="-s lager" 
-	$(REBAR) skip_deps=true eunit
-
 clean-eunit: clean
 	rm -rf .eunit log
