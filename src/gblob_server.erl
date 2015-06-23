@@ -1,7 +1,7 @@
 -module(gblob_server).
 -behaviour(gen_server).
 
--export([start_link/2, start_link/3, stop/1, put/2, put/3, put/4,
+-export([start_link/2, start_link/3, stop/1, put/2, put/3, put/4, close/1,
          get/2, get/3, status/1, truncate/2, truncate_percentage/2, size/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
          code_change/3]).
@@ -25,6 +25,9 @@ start_link(Path, GblobOpts, ServerOpts) ->
 
 stop(Module) ->
     gen_server:call(Module, stop).
+
+close(Module) ->
+    gen_server:call(Module, close).
 
 put(Pid, Data) ->
     gen_server:call(Pid, {put, Data}).
@@ -68,6 +71,11 @@ handle_call(stop, _From, State=#state{gblob=Gblob}) ->
     NewGblob = gblob:close(Gblob),
     NewState = update_gblob(State, NewGblob, false),
     {stop, normal, stopped, NewState};
+
+handle_call(close, _From, State=#state{gblob=Gblob}) ->
+    NewGblob = gblob:close(Gblob),
+    NewState = update_gblob(State, NewGblob, false),
+    {reply, ok, NewState};
 
 handle_call(status, _From, State=#state{active=Active,
                                         last_action=LastAction,
