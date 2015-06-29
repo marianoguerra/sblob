@@ -202,7 +202,7 @@ do_check(State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=Che
 
     {NewActive, NewGblob} = if
                                 ShouldClose ->
-                                    lager:info("closing inactive gblob ~s", [Path]),
+                                    lager:debug("closing inactive gblob ~s", [Path]),
                                     {false, gblob:close(Gblob)};
                                 true ->
                                     {true, Gblob}
