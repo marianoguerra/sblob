@@ -128,8 +128,8 @@ handle_info(timeout, State=#state{active=false}) ->
 handle_info(timeout, State) ->
     {noreply, do_check(State)};
 
-handle_info(check_eviction, State=#state{gblob=Gblob}) ->
-    {noreply, check_eviction(Gblob, State)};
+handle_info(evict, State=#state{gblob=Gblob}) ->
+    {noreply, evict(Gblob, State)};
 
 handle_info(Msg, State) ->
     io:format("Unexpected handle info message: ~p~n",[Msg]),
@@ -150,8 +150,7 @@ update_gblob(State, NewGblob) ->
 update_gblob(State, NewGblob, Active) ->
     State#state{gblob=NewGblob, last_action=sblob_util:now_fast(), active=Active}.
 
-check_eviction(Gblob=#gblob{path=Path},
-               State=#state{last_eviction=LastEviction,
+check_eviction(State=#state{last_eviction=LastEviction,
                             max_interval_no_eviction_ms=MaxIntervalNoEvictionMs}) ->
 
     Now = sblob_util:now_fast(),
@@ -163,15 +162,13 @@ check_eviction(Gblob=#gblob{path=Path},
                           LastEviction == 0 -> Now;
                           true -> LastEviction
                       end,
+    NewState = State#state{last_eviction=NewEvictionTime},
+    {ShouldEvict, NewState}.
 
-    if
-        ShouldEvict ->
-            lager:debug("max interval with no eviction, calling ~s ~p < ~p",
-                       [Path, LastEviction, LastEvictionTime]),
-            NewGblob = do_eviction(Gblob),
-            State#state{gblob=NewGblob, last_eviction=Now};
-        true -> State#state{last_eviction=NewEvictionTime}
-    end.
+evict(Gblob, State) ->
+    Now = sblob_util:now_fast(),
+    NewGblob = do_eviction(Gblob),
+    State#state{gblob=NewGblob, last_eviction=Now}.
 
 put_blob(Gblob, Timestamp, Data, nil) ->
     gblob:put(Gblob, Timestamp, Data);
@@ -184,8 +181,11 @@ put_blob(Gblob, Timestamp, Data, LastSeqNum) ->
 
 server_put(Gblob, Timestamp, Data, LastSeqNum, State) ->
     {Gblob1, Reply} = put_blob(Gblob, Timestamp, Data, LastSeqNum),
-    NewState = update_gblob(State, Gblob1),
-    timer:send_after(1, check_eviction),
+    State1 = update_gblob(State, Gblob1),
+    {ShouldEvict, NewState} = check_eviction(State1),
+    if ShouldEvict -> timer:send_after(1, evict);
+       true -> ok
+    end,
     {reply, Reply, NewState, NewState#state.check_interval_ms}.
 
 do_eviction(Gblob=#gblob{path=Path}) ->
