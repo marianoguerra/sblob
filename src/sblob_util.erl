@@ -1,11 +1,11 @@
 -module(sblob_util).
 -export([parse_config/1, now/0, now_fast/0,
-         get_handle/1, seek/2, seek_to_seqnum/2,
+         get_handle/1, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
-         deep_size/1,
+         deep_size/1, recover/2,
          get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
-         get_next/1, get_first/1, get_last/1, read_until/4,
+         get_next/1, read_until/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
@@ -34,6 +34,9 @@ parse_config([{max_items, Val}|T], Config) ->
 parse_config([{base_seqnum, Val}|T], Config) ->
     parse_config(T, Config#sblob_cfg{base_seqnum=Val});
 
+parse_config([{uid, _Val}|T], Config) ->
+    parse_config(T, Config);
+
 parse_config([], Config) ->
     Config.
 
@@ -42,7 +45,7 @@ open_file(Path, _ReadAhead) ->
 
 open_file(Path, _ReadAhead, file_handle_cache) ->
     % XXX ignore ReadAhead for now since not on file_handle_cache
-    % TODO: see last opetions to open
+    % TODO: see last options to open
     {ok, Handle} = file_handle_cache:open(Path, [raw, binary, read, append], []),
     Handle;
 
@@ -72,11 +75,11 @@ seek(#sblob{handle=nil}=Sblob, Location) ->
 seek(#sblob{handle=Handle, name=Name}=Sblob, Location) ->
     lager:debug("seek ~s ~p", [Name, Location]),
     case file_handle_cache:position(Handle, Location) of
-        {ok, NewPos} -> Sblob#sblob{position=NewPos};
+        {ok, NewPos} -> {ok, Sblob#sblob{position=NewPos}};
         Error ->
             lager:error("error seeking sblob ~p to ~p: ~p",
                         [Name, Location, Error]),
-            sblob:close(Sblob)
+            {error, Error, sblob:close(Sblob)}
     end.
 
 seek_to_seqnum(Sblob, SeqNum) ->
@@ -94,19 +97,30 @@ fill_bounds(#sblob{name=Name}=Sblob) ->
     CfgBaseSeqNum = Cfg#sblob_cfg.base_seqnum,
     MaxItems = Cfg#sblob_cfg.max_items,
     case First of
-        notfound -> 
+        notfound ->
             lager:debug("fill bounds, empty ~s", [Name]),
             Index = sblob_idx:new(CfgBaseSeqNum + 1, MaxItems),
-            Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum,
-                         size=0, index=Index};
+            {ok, Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum,
+                         size=0, index=Index}};
         #sblob_entry{seqnum=FirstSeqNum, offset=FirstOffset} ->
-            {Sblob2, #sblob_entry{seqnum=LastSeqNum, offset=LastOffset}} = get_last(Sblob1),
-            BaseSeqNum = FirstSeqNum  - 1,
-            lager:debug("fill bounds ~s ~p - ~p", [Name, BaseSeqNum, LastSeqNum]),
-            Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
-            Index1 = sblob_idx:put(Index, FirstSeqNum, FirstOffset),
-            Index2 = sblob_idx:put(Index1, LastSeqNum, LastOffset),
-            Sblob2#sblob{base_seqnum=BaseSeqNum, seqnum=LastSeqNum, index=Index2}
+            case get_last(Sblob1) of
+                {ok, {Sblob2, #sblob_entry{seqnum=LastSeqNum,
+                                           offset=LastOffset}}} ->
+                    BaseSeqNum = FirstSeqNum  - 1,
+                    lager:debug("fill bounds ~s ~p - ~p", [Name, BaseSeqNum, LastSeqNum]),
+                    Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
+                    try
+                        Index1 = sblob_idx:put(Index, FirstSeqNum, FirstOffset),
+                        Index2 = sblob_idx:put(Index1, LastSeqNum, LastOffset),
+                        {ok, Sblob2#sblob{base_seqnum=BaseSeqNum,
+                                          seqnum=LastSeqNum, index=Index2}}
+                    catch
+                        EType:EReason ->
+                            sblob:close(Sblob2),
+                            {error, {EType, EReason}}
+                    end;
+                {error, _Reason}=Error -> Error
+            end
     end.
 
 read(#sblob{handle=nil}=Sblob, Len) ->
@@ -193,24 +207,31 @@ get_next(Sblob) ->
 
 get_first(#sblob{fullpath=FullPath}=Sblob) ->
     lager:debug("get_first ~s", [FullPath]),
-    NewSblob = seek(Sblob, bof),
+    {ok, NewSblob} = seek(Sblob, bof),
     get_next(NewSblob).
 
 get_last(#sblob{fullpath=FullPath}=Sblob) ->
     lager:debug("get_last ~s", [FullPath]),
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
 
-    Sblob1 = seek(Sblob, {eof, -LenSize}),
-    {Sblob2, LenData} = read(Sblob1, LenSize),
-    % since we read the last 4 bytes for the entry len we are at the end,
-    % that means that now position == size, we use it to set the blob size
-    SblobSize = Sblob2#sblob.position,
-    {ok, <<EntryDataLen:?SBLOB_HEADER_LEN_SIZE_BITS/integer>>} = LenData,
+    case seek(Sblob, {eof, -LenSize}) of
+        {ok, Sblob1} ->
+            {Sblob2, LenData} = read(Sblob1, LenSize),
+            % since we read the last 4 bytes for the entry len we are at
+            % the end, that means that now position == size, we use it to
+            % set the blob size
+            SblobSize = Sblob2#sblob.position,
+            {ok, <<EntryDataLen:?SBLOB_HEADER_LEN_SIZE_BITS/integer>>} = LenData,
 
-    Offset = blob_size(EntryDataLen),
+            Offset = blob_size(EntryDataLen),
 
-    Sblob3 = seek(Sblob2#sblob{size=SblobSize}, {cur, -Offset}),
-    get_next(Sblob3).
+            case seek(Sblob2#sblob{size=SblobSize}, {cur, -Offset}) of
+                {ok, Sblob3} -> {ok, get_next(Sblob3)};
+                {error, Error, _Sblob3} -> {error, {seek_error, Error}}
+            end;
+        {error, Error, _Sblob1} ->
+            {error, {seek_error, Error}}
+    end.
 
 
 read_until(#sblob{name=Name}=Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
@@ -337,3 +358,10 @@ get_blob_info(BasePath, Name, Index) ->
             #sblob_info{path=FullPath, name=Name, index=Index, size=0, mtime=0}
     end.
 
+recover(#sblob{fullpath=Path, name=Name}, Uid) ->
+    lager:warning("recover at the moment moves faulty block ~p: ~p",
+                  [Name, Path]),
+    case file:rename(Path, Path ++ "." ++ Uid ++ ".broken") of
+        ok -> ok;
+        {error, enoent} -> ok
+    end.

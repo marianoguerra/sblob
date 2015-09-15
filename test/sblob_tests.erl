@@ -449,3 +449,28 @@ parse_config_test() ->
     ?assertEqual(Cfg#sblob_cfg.max_items, 1),
     ?assertEqual(Cfg#sblob_cfg.base_seqnum, 50),
     ?assertEqual(Cfg#sblob_cfg.read_ahead, 0).
+
+test_recover(BaseName, Name, Uid) ->
+    BaseDir = filename:absname("../test/data/broken"),
+    AbsBaseName = filename:join(BaseDir, BaseName),
+    AbsName = filename:join(BaseDir, Name),
+    BrokenName = Name ++ "." ++ Uid ++ ".broken",
+
+    {ok, _} = file:copy(AbsBaseName, AbsName),
+
+    RecoverPath = filename:join(BaseDir, BrokenName),
+    Sblob = sblob:open(BaseDir, Name, [{uid, Uid}]),
+    _Sblob1 = sblob:close(Sblob),
+
+    RecoverExists = filelib:is_regular(RecoverPath),
+
+    file:delete(AbsName),
+    file:delete(RecoverPath),
+
+    ?assertEqual(RecoverExists, true).
+
+recover_broken_sblob_test() ->
+    test_recover("init-alarms", "broken1", "uid1").
+
+recover_broken_entry_zeros_test() ->
+    test_recover("zeros", "broken2", "uid2").

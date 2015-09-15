@@ -19,9 +19,21 @@ open(Path, Name, Opts) ->
     ok = filelib:ensure_dir(FullPath),
     Sblob = #sblob{path=AbsPath, fullpath=FullPath, name=Name, config=Config},
 
-    Result = sblob_util:fill_bounds(Sblob),
-    lager:debug("open ~p", [lager:pr(Result, ?MODULE)]),
-    Result.
+    case sblob_util:fill_bounds(Sblob) of
+        {ok, Result} ->
+            lager:debug("open ~p", [lager:pr(Result, ?MODULE)]),
+            Result;
+        {error, Reason} ->
+            lager:warning("error filling sblob bounds ~p, trying to recover",
+                          [Reason]),
+
+            NowStr = integer_to_list(sblob_util:now()),
+            Uid = proplists:get_value(uid, Opts, NowStr),
+            ok = sblob_util:recover(Sblob, Uid),
+            % should work second time otherwise crash
+            {ok, Result} = sblob_util:fill_bounds(Sblob),
+            Result
+    end.
 
 close(#sblob{handle=nil}=Sblob) ->
     lager:debug("close, no handle ~p", [lager:pr(Sblob, ?MODULE)]),
