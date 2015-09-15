@@ -13,9 +13,8 @@
 
 -include_lib("kernel/include/file.hrl").
 
-now() ->
-    {Mega, Sec, Micro} = erlang:now(),
-    ((Mega * 1000000 + Sec) * 1000000 + Micro) div 1000.
+% it makes no sense to use erlang:now() since we are dividing by 1000
+now() -> now_fast().
 
 % If you do not need the return value to be unique and monotonically
 % increasing, use os:timestamp/0 instead to avoid some overhead.
