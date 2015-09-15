@@ -1,5 +1,6 @@
 PROJECT=sblob
 include erlang.mk
+DEPS = lager
 
 ERLFLAGS= -pa $(CURDIR)/.eunit -pa $(CURDIR)/ebin -pa $(CURDIR)/deps/*/ebin
 
