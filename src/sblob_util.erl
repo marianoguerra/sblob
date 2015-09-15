@@ -72,8 +72,13 @@ seek(#sblob{handle=nil}=Sblob, Location) ->
     seek(Sblob1, Location);
 seek(#sblob{handle=Handle, name=Name}=Sblob, Location) ->
     lager:debug("seek ~s ~p", [Name, Location]),
-    {ok, NewPos} = file_handle_cache:position(Handle, Location),
-    Sblob#sblob{position=NewPos}.
+    case file_handle_cache:position(Handle, Location) of
+        {ok, NewPos} -> Sblob#sblob{position=NewPos};
+        Error ->
+            lager:error("error seeking sblob ~p to ~p: ~p",
+                        [Name, Location, Error]),
+            sblob:close(Sblob)
+    end.
 
 seek_to_seqnum(Sblob, SeqNum) ->
     {Handle, NewSblob} = get_handle(Sblob),
