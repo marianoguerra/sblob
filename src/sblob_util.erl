@@ -267,9 +267,11 @@ get_next(Sblob) ->
 
                           {ok, {Sblob3, Entry}};
                       true ->
+                          sblob:close(Sblob2),
                           {error, {corrupt_len_field, {Len, TailLenVal}}}
                    end;
                true ->
+                   sblob:close(Sblob2),
                    {error, {short_read,
                             {expected, TailLen, got, ActualTailLen}}}
             end;
