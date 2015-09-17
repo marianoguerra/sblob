@@ -328,16 +328,23 @@ read_until(Sblob, CurSeqNum, TargetSeqNum, _Accumulate, Accum)
 read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Accumulate, Accum) ->
     {Sblob, CurSeqNum, lists:reverse(Accum)};
 
-read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
+read_until(Sblob=#sblob{fullpath=FullPath}, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
     case get_next(Sblob) of
-        {ok, {TSblob1, notfound}} -> {TSblob1, CurSeqNum, lists:reverse(Accum)};
+        {ok, {TSblob1, notfound}} ->
+            {TSblob1, CurSeqNum, lists:reverse(Accum)};
         {ok, {Sblob1, Blob}} ->
             NewAccum = if Accumulate -> [Blob|Accum];
                           true -> Accum
                        end,
 
             read_until(Sblob1, Blob#sblob_entry.seqnum + 1, TargetSeqNum,
-                       Accumulate, NewAccum)
+                       Accumulate, NewAccum);
+        {error, Reason} ->
+            lager:warning("error in read_until ~p: ~p", [FullPath, Reason]),
+            % XXX get_next should close the handle but doesn't return the sblob
+            % so we set it to nil here:
+            % TODO: we should signal there was an error here
+            {Sblob#sblob{handle=nil}, CurSeqNum, lists:reverse(Accum)}
     end.
 
 handle_get_one(Result) ->
