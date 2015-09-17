@@ -240,25 +240,39 @@ get_next(Sblob) ->
     case header_from_binary(Header) of
         {ok, HeaderEntry} ->
             Len = HeaderEntry#sblob_entry.len,
-            ExpectedTailLen = Len + ?SBLOB_HEADER_LEN_SIZE_BYTES,
-            {Sblob2, {ok, Tail}} = read(Sblob1, ExpectedTailLen),
-            Data = binary:part(Tail, 0, Len),
-            EntryOffset = Sblob#sblob.position,
-            Entry = HeaderEntry#sblob_entry{data=Data,
-                                            offset=EntryOffset,
-                                            size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
+            Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
+            TailLen = Len + Shlsb,
+            {Sblob2, {ok, Tail}} = read(Sblob1, TailLen),
+            ActualTailLen = size(Tail),
 
-            BlobSeqNum = Entry#sblob_entry.seqnum,
-            Index = Sblob2#sblob.index,
-            NewIndex = if
-                Index == nil -> Index;
-                true ->
-                    sblob_idx:put(Index, BlobSeqNum, EntryOffset)
-            end,
-            Sblob3 = Sblob2#sblob{index=NewIndex},
+            if TailLen =:= ActualTailLen ->
+                   <<Data:Len/binary, TailLenVal:32/integer>> = Tail,
 
-            {Sblob3, Entry};
+                   if TailLenVal =:= Len ->
+                          EntrySize = ?SBLOB_HEADER_SIZE_BYTES + TailLen,
+                          EntryOffset = Sblob#sblob.position,
+                          Entry = HeaderEntry#sblob_entry{data=Data,
+                                                          offset=EntryOffset,
+                                                          size=EntrySize},
 
+                          BlobSeqNum = Entry#sblob_entry.seqnum,
+                          Index = Sblob2#sblob.index,
+                          NewIndex = if Index == nil -> Index;
+                                        true ->
+                                            sblob_idx:put(Index,
+                                                          BlobSeqNum,
+                                                          EntryOffset)
+                                     end,
+                          Sblob3 = Sblob2#sblob{index=NewIndex},
+
+                          {Sblob3, Entry};
+                      true ->
+                          {error, {corrupt_len_field, {Len, TailLenVal}}}
+                   end;
+               true ->
+                   {error, {short_read,
+                            {expected, TailLen, got, ActualTailLen}}}
+            end;
         Error -> Error
     end.
 
