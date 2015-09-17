@@ -31,7 +31,9 @@ open(Path, Name, Opts) ->
             Uid = proplists:get_value(uid, Opts, NowStr),
             ok = sblob_util:recover(Sblob, Uid),
             % should work second time otherwise crash
-            {ok, Result} = sblob_util:fill_bounds(Sblob),
+            Sblob1 = #sblob{path=AbsPath, fullpath=FullPath, name=Name,
+                            config=Config},
+            {ok, Result} = sblob_util:fill_bounds(Sblob1),
             Result
     end.
 
