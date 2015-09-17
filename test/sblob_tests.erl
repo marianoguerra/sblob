@@ -474,3 +474,17 @@ recover_broken_sblob_test() ->
 
 recover_broken_entry_zeros_test() ->
     test_recover("zeros", "broken2", "uid2").
+
+fold_fun({_, Ts, Sn, Ln, _Data, Os, Sz}, CurSize) ->
+    NewSize = CurSize + Sz,
+    {continue, NewSize}.
+
+test_fold_truncated_test() ->
+    R = sblob_util:fold("../test/data/broken", "truncated", [], fun fold_fun/2,
+                        0),
+    ?assertEqual(R, {error, {short_read, {expected, 721, got, 710}}, 1482}).
+
+test_fold_badlen_test() ->
+    R = sblob_util:fold("../test/data/broken", "badlen", [], fun fold_fun/2,
+                        0),
+    ?assertEqual(R, {error,{corrupt_len_field,{717,24842}},1482}).

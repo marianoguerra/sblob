@@ -173,11 +173,26 @@ raw_get_next(Handle) ->
 
              HeaderEntry = header_from_binary(Header),
              Len = HeaderEntry#sblob_entry.len,
-             {ok, Tail} = file:read(Handle, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
-             Data = binary:part(Tail, 0, Len),
-             Entry = HeaderEntry#sblob_entry{data=Data,
-                                             size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
-             Entry;
+             Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
+             TailLen = Len + Shlsb,
+             {ok, Tail} = file:read(Handle, TailLen),
+             ActualTailLen = size(Tail),
+
+             if TailLen =:= ActualTailLen ->
+                 <<Data:Len/binary, TailLenVal:32/integer>> = Tail,
+
+                 if TailLenVal =:= Len ->
+                     EntrySize = ?SBLOB_HEADER_SIZE_BYTES + TailLen,
+                     Entry = HeaderEntry#sblob_entry{data=Data,
+                                                     size=EntrySize},
+                     {ok, Entry};
+                    true ->
+                        {error, {corrupt_len_field, {Len, TailLenVal}}}
+                 end;
+                true ->
+                    {error, {short_read,
+                             {expected, TailLen, got, ActualTailLen}}}
+             end;
          eof -> eof
      end.
 
@@ -298,7 +313,7 @@ do_fold(Handle, Fun, Acc0) ->
             file:close(Handle),
             {eof, Acc0};
 
-        Entry ->
+        {ok, Entry} ->
             case Fun(Entry, Acc0) of
                 {continue, Acc1} ->
                     do_fold(Handle, Fun, Acc1);
@@ -306,7 +321,10 @@ do_fold(Handle, Fun, Acc0) ->
                 {stop, _AccEnd}=Res -> 
                     file:close(Handle),
                     Res
-            end
+            end;
+        {error, Reason} ->
+            file:close(Handle),
+            {error, Reason, Acc0}
     end.
 
 % like lists:foldl but the result of Fun is a tagged tuple that indicates
