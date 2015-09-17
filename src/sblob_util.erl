@@ -391,7 +391,13 @@ seqread(Path, ChunkName, SeqNum, Count, Opts) ->
     ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
     Handle = open_file(SblobPath, ReadAhead, file),
     FoldFun = fun seqread_fold_fun/2,
-    {_, AccOut}  = do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}),
+    AccOut = case do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}) of
+                 {_, AccOut0} -> AccOut0;
+                 {error, Reason, AccOut0} ->
+                     lager:error("in seqread ~p: ~p", [SblobPath, Reason]),
+                     AccOut0
+             end,
+
     {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
     {lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount}.
 
