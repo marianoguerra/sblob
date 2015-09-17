@@ -292,7 +292,9 @@ do_fold(Fun, AccIn, [H|T]) ->
                true -> do_fold(Fun, AccOut, T)
             end;
         {stop, _}=ResStop ->
-            ResStop
+            ResStop;
+        {error, _Reason, _Acc0} = Error ->
+            Error
     end.
 
 % like lists:foldl but the result of Fun is a tagged tuple that indicates

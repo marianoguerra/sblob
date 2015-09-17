@@ -170,7 +170,6 @@ offset_for_seqnum(#sblob{index=Idx}, SeqNum) ->
 raw_get_next(Handle) ->
      case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
          {ok, Header} ->
-
              HeaderEntry = header_from_binary(Header),
              Len = HeaderEntry#sblob_entry.len,
              Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
