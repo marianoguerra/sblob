@@ -354,7 +354,10 @@ read_until(Sblob=#sblob{fullpath=FullPath}, CurSeqNum, TargetSeqNum, Accumulate,
             % XXX get_next should close the handle but doesn't return the sblob
             % so we set it to nil here:
             % TODO: we should signal there was an error here
-            {Sblob#sblob{handle=nil}, CurSeqNum, lists:reverse(Accum)}
+            NewSblob = Sblob#sblob{handle=nil},
+            Uid = integer_to_list(sblob_util:now()),
+            ok = sblob_util:recover(NewSblob, Uid),
+            {NewSblob, CurSeqNum, lists:reverse(Accum)}
     end.
 
 handle_get_one(Result) ->
