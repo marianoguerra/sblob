@@ -475,8 +475,11 @@ recover_broken_sblob_test() ->
 recover_broken_entry_zeros_test() ->
     test_recover("zeros", "broken2", "uid2").
 
-fold_fun({_, Ts, Sn, Ln, _Data, Os, Sz}, CurSize) ->
-    NewSize = CurSize + Sz,
+recover_broken_short_header_test() ->
+    test_recover("shortheader", "broken3", "uid3").
+
+fold_fun(#sblob_entry{size=Size}, CurSize) ->
+    NewSize = CurSize + Size,
     {continue, NewSize}.
 
 test_fold_truncated_test() ->

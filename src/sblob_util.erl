@@ -7,7 +7,7 @@
          handle_get_one/1, seqread/5, fold/5,
          get_next/1, read_until/4,
          open_file/2, open_read_file/1, close_file/1, file_append/4,
-         to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
+         to_binary/1, to_binary/3, from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
 -include("sblob.hrl").
@@ -111,36 +111,48 @@ seek_to_seqnum(Sblob, SeqNum) ->
     {ok, NewPos} = file_handle_cache:position(Handle, {bof, Offset}),
     {OffsetKey, NewSblob#sblob{position=NewPos}}.
 
+fill_bounds_end(#sblob{name=Name}=Sblob1, FirstSeqNum, FirstOffset,
+                MaxItems) ->
+    case get_last(Sblob1) of
+        {ok, {Sblob2, #sblob_entry{seqnum=LastSeqNum,
+                                   offset=LastOffset}}} ->
+            BaseSeqNum = FirstSeqNum  - 1,
+            lager:debug("fill bounds ~s ~p - ~p",
+                        [Name, BaseSeqNum, LastSeqNum]),
+            Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
+            try
+                Index1 = sblob_idx:put(Index, FirstSeqNum, FirstOffset),
+                Index2 = sblob_idx:put(Index1, LastSeqNum, LastOffset),
+                {ok, Sblob2#sblob{base_seqnum=BaseSeqNum,
+                                  seqnum=LastSeqNum, index=Index2}}
+            catch
+                EType:EReason ->
+                    sblob:close(Sblob2),
+                    {error, {EType, EReason}}
+            end;
+        {error, _Reason}=Error -> Error
+    end.
+
 fill_bounds(#sblob{name=Name}=Sblob) ->
-    {Sblob1, First} = get_first(Sblob),
-    Cfg = Sblob1#sblob.config,
-    CfgBaseSeqNum = Cfg#sblob_cfg.base_seqnum,
-    MaxItems = Cfg#sblob_cfg.max_items,
-    case First of
-        notfound ->
-            lager:debug("fill bounds, empty ~s", [Name]),
-            Index = sblob_idx:new(CfgBaseSeqNum + 1, MaxItems),
-            {ok, Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum,
-                         size=0, index=Index}};
-        #sblob_entry{seqnum=FirstSeqNum, offset=FirstOffset} ->
-            case get_last(Sblob1) of
-                {ok, {Sblob2, #sblob_entry{seqnum=LastSeqNum,
-                                           offset=LastOffset}}} ->
-                    BaseSeqNum = FirstSeqNum  - 1,
-                    lager:debug("fill bounds ~s ~p - ~p", [Name, BaseSeqNum, LastSeqNum]),
-                    Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
-                    try
-                        Index1 = sblob_idx:put(Index, FirstSeqNum, FirstOffset),
-                        Index2 = sblob_idx:put(Index1, LastSeqNum, LastOffset),
-                        {ok, Sblob2#sblob{base_seqnum=BaseSeqNum,
-                                          seqnum=LastSeqNum, index=Index2}}
-                    catch
-                        EType:EReason ->
-                            sblob:close(Sblob2),
-                            {error, {EType, EReason}}
-                    end;
-                {error, _Reason}=Error -> Error
-            end
+    case get_first(Sblob) of
+        {ok, {Sblob1, First}} ->
+            Cfg = Sblob1#sblob.config,
+            CfgBaseSeqNum = Cfg#sblob_cfg.base_seqnum,
+            MaxItems = Cfg#sblob_cfg.max_items,
+
+            case First of
+                notfound ->
+                    lager:debug("fill bounds, empty ~s", [Name]),
+                    Index = sblob_idx:new(CfgBaseSeqNum + 1, MaxItems),
+                    {ok, Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum,
+                                      size=0, index=Index}};
+                #sblob_entry{seqnum=FirstSeqNum, offset=FirstOffset} ->
+                    fill_bounds_end(Sblob1, FirstSeqNum, FirstOffset,
+                                   MaxItems)
+            end;
+        {error, Reason, NewSblob} ->
+            sblob:close(NewSblob),
+            {error, Reason}
     end.
 
 read(#sblob{handle=nil}=Sblob, Len) ->
@@ -164,7 +176,10 @@ from_binary(<<Timestamp:64/integer, SeqNum:64/integer, Len:32/integer, Tail/bina
                  size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)}.
 
 header_from_binary(<<Timestamp:64/integer, SeqNum:64/integer, Len:32/integer, _Tail/binary>>) ->
-    #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=Len, data=nil}.
+    {ok, #sblob_entry{timestamp=Timestamp, seqnum=SeqNum, len=Len,
+                      data=nil}};
+header_from_binary(Data) ->
+    {error, {bad_header, Data}}.
 
 clear_data(Entry) ->
     Entry#sblob_entry{data=nil}.
@@ -190,27 +205,30 @@ offset_for_seqnum(#sblob{index=Idx}, SeqNum) ->
 raw_get_next(Handle) ->
      case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
          {ok, Header} ->
-             HeaderEntry = header_from_binary(Header),
-             Len = HeaderEntry#sblob_entry.len,
-             Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
-             TailLen = Len + Shlsb,
-             {ok, Tail} = file:read(Handle, TailLen),
-             ActualTailLen = size(Tail),
+             case header_from_binary(Header) of
+                 {ok, HeaderEntry} ->
+                     Len = HeaderEntry#sblob_entry.len,
+                     Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
+                     TailLen = Len + Shlsb,
+                     {ok, Tail} = file:read(Handle, TailLen),
+                     ActualTailLen = size(Tail),
 
-             if TailLen =:= ActualTailLen ->
-                 <<Data:Len/binary, TailLenVal:32/integer>> = Tail,
+                     if TailLen =:= ActualTailLen ->
+                            <<Data:Len/binary, TailLenVal:32/integer>> = Tail,
 
-                 if TailLenVal =:= Len ->
-                     EntrySize = ?SBLOB_HEADER_SIZE_BYTES + TailLen,
-                     Entry = HeaderEntry#sblob_entry{data=Data,
-                                                     size=EntrySize},
-                     {ok, Entry};
-                    true ->
-                        {error, {corrupt_len_field, {Len, TailLenVal}}}
-                 end;
-                true ->
-                    {error, {short_read,
-                             {expected, TailLen, got, ActualTailLen}}}
+                            if TailLenVal =:= Len ->
+                                   EntrySize = ?SBLOB_HEADER_SIZE_BYTES + TailLen,
+                                   Entry = HeaderEntry#sblob_entry{data=Data,
+                                                                   size=EntrySize},
+                                   {ok, Entry};
+                               true ->
+                                   {error, {corrupt_len_field, {Len, TailLenVal}}}
+                            end;
+                        true ->
+                            {error, {short_read,
+                                     {expected, TailLen, got, ActualTailLen}}}
+                     end;
+                {error, _Reason}=Error -> Error
              end;
          eof -> eof
      end.
@@ -219,30 +237,39 @@ get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {Sblob, notfound};
 
 get_next(Sblob) ->
     {Sblob1, {ok, Header}} = read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
-    HeaderEntry = header_from_binary(Header),
-    Len = HeaderEntry#sblob_entry.len,
-    {Sblob2, {ok, Tail}} = read(Sblob1, Len + ?SBLOB_HEADER_LEN_SIZE_BYTES),
-    Data = binary:part(Tail, 0, Len),
-    EntryOffset = Sblob#sblob.position,
-    Entry = HeaderEntry#sblob_entry{data=Data,
-                                    offset=EntryOffset,
-                                    size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
+    case header_from_binary(Header) of
+        {ok, HeaderEntry} ->
+            Len = HeaderEntry#sblob_entry.len,
+            ExpectedTailLen = Len + ?SBLOB_HEADER_LEN_SIZE_BYTES,
+            {Sblob2, {ok, Tail}} = read(Sblob1, ExpectedTailLen),
+            Data = binary:part(Tail, 0, Len),
+            EntryOffset = Sblob#sblob.position,
+            Entry = HeaderEntry#sblob_entry{data=Data,
+                                            offset=EntryOffset,
+                                            size=?SBLOB_HEADER_SIZE_BYTES + size(Tail)},
 
-    BlobSeqNum = Entry#sblob_entry.seqnum,
-    Index = Sblob2#sblob.index,
-    NewIndex = if
-        Index == nil -> Index;
-        true ->
-            sblob_idx:put(Index, BlobSeqNum, EntryOffset)
-    end,
-    Sblob3 = Sblob2#sblob{index=NewIndex},
+            BlobSeqNum = Entry#sblob_entry.seqnum,
+            Index = Sblob2#sblob.index,
+            NewIndex = if
+                Index == nil -> Index;
+                true ->
+                    sblob_idx:put(Index, BlobSeqNum, EntryOffset)
+            end,
+            Sblob3 = Sblob2#sblob{index=NewIndex},
 
-    {Sblob3, Entry}.
+            {Sblob3, Entry};
+
+        Error -> Error
+    end.
 
 get_first(#sblob{fullpath=FullPath}=Sblob) ->
     lager:debug("get_first ~s", [FullPath]),
     {ok, NewSblob} = seek(Sblob, bof),
-    get_next(NewSblob).
+    case get_next(NewSblob) of
+        {error, Reason} ->
+            {error, Reason, NewSblob};
+        {_SblobOut, _Entry} = Res -> {ok, Res}
+    end.
 
 get_last(#sblob{fullpath=FullPath}=Sblob) ->
     lager:debug("get_last ~s", [FullPath]),
@@ -288,7 +315,8 @@ read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
                           true -> Accum
                        end,
 
-            read_until(Sblob1, Blob#sblob_entry.seqnum + 1, TargetSeqNum, Accumulate, NewAccum)
+            read_until(Sblob1, Blob#sblob_entry.seqnum + 1, TargetSeqNum,
+                       Accumulate, NewAccum)
     end.
 
 handle_get_one(Result) ->
@@ -472,8 +500,8 @@ recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name},
         end
     catch
         EType:EReason ->
-            lager:warning("Error trying to recover file ~p: ~p ~p, truncating",
-                          [FullPath, EType, EReason])
+            lager:warning("Error recovering file ~p: ~p ~p, truncating~n~p",
+                          [FullPath, EType, EReason, erlang:get_stacktrace()])
     after
         close_file(Handle),
         recover_move(Sblob, Uid)
