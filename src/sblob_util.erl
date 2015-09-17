@@ -159,8 +159,18 @@ read(#sblob{handle=nil}=Sblob, Len) ->
     {_, NewSblob} = get_handle(Sblob),
     read(NewSblob, Len);
 
-read(#sblob{position=Pos, handle=Handle}=Sblob, Len) ->
-    {Sblob#sblob{position=Pos + Len}, file_handle_cache:read(Handle, Len)}.
+read(#sblob{position=Pos, handle=Handle, fullpath=FullPath}=Sblob, Len) ->
+    Result = file_handle_cache:read(Handle, Len),
+    NewPosition = case Result of
+                      {ok, Data} -> Pos + size(Data);
+                      Other ->
+                          lager:error("error reading file ~p: ~p",
+                                      [FullPath, Other]),
+                          % TODO: we should handle this everywhere, but for
+                          % now at least log the error
+                          Pos
+                  end,
+    {Sblob#sblob{position=NewPosition}, Result}.
 
 to_binary(#sblob_entry{timestamp=Timestamp, seqnum=SeqNum, data=Data}) ->
     to_binary(Timestamp, SeqNum, Data).
