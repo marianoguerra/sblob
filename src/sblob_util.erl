@@ -5,7 +5,7 @@
          deep_size/1, recover_move/2, recover/2,
          get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
-         get_next/1, read_until/4,
+         read_until/4,
          open_file/2, open_read_file/1, close_file/1, file_append/4,
          to_binary/1, to_binary/3, from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
@@ -233,7 +233,7 @@ raw_get_next(Handle) ->
          eof -> eof
      end.
 
-get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {Sblob, notfound};
+get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {ok, {Sblob, notfound}};
 
 get_next(Sblob) ->
     {Sblob1, {ok, Header}} = read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
@@ -265,7 +265,7 @@ get_next(Sblob) ->
                                      end,
                           Sblob3 = Sblob2#sblob{index=NewIndex},
 
-                          {Sblob3, Entry};
+                          {ok, {Sblob3, Entry}};
                       true ->
                           {error, {corrupt_len_field, {Len, TailLenVal}}}
                    end;
@@ -282,7 +282,7 @@ get_first(#sblob{fullpath=FullPath}=Sblob) ->
     case get_next(NewSblob) of
         {error, Reason} ->
             {error, Reason, NewSblob};
-        {_SblobOut, _Entry} = Res -> {ok, Res}
+        {ok, {_SblobOut, _Entry}} = Res -> Res
     end.
 
 get_last(#sblob{fullpath=FullPath}=Sblob) ->
@@ -301,7 +301,12 @@ get_last(#sblob{fullpath=FullPath}=Sblob) ->
             Offset = blob_size(EntryDataLen),
 
             case seek(Sblob2#sblob{size=SblobSize}, {cur, -Offset}) of
-                {ok, Sblob3} -> {ok, get_next(Sblob3)};
+                {ok, Sblob3} ->
+                    case get_next(Sblob3) of
+                        {error, _Reason}=Error -> Error;
+                        {ok, {_SblobOut, _Entry}} = Result -> Result
+                    end;
+
                 {error, Error, _Sblob3} -> {error, {seek_error, Error}}
             end;
         {error, Error, _Sblob1} ->
@@ -323,8 +328,8 @@ read_until(#sblob{size=Size, position=Size}=Sblob, CurSeqNum, _TargetSeqNum, _Ac
 
 read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, Accum) ->
     case get_next(Sblob) of
-        {TSblob1, notfound} -> {TSblob1, CurSeqNum, lists:reverse(Accum)};
-        {Sblob1, Blob} ->
+        {ok, {TSblob1, notfound}} -> {TSblob1, CurSeqNum, lists:reverse(Accum)};
+        {ok, {Sblob1, Blob}} ->
             NewAccum = if Accumulate -> [Blob|Accum];
                           true -> Accum
                        end,
