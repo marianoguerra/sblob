@@ -358,10 +358,12 @@ get_blob_info(BasePath, Name, Index) ->
             #sblob_info{path=FullPath, name=Name, index=Index, size=0, mtime=0}
     end.
 
-recover(#sblob{fullpath=Path, name=Name}, Uid) ->
+recover(#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
     lager:warning("recover at the moment moves faulty block ~p: ~p",
                   [Name, Path]),
-    case file:rename(Path, Path ++ "." ++ Uid ++ ".broken") of
+    BrokenName = "broken." ++ Name ++ "." ++ Uid,
+    BrokenPath = filename:join(Path, BrokenName),
+    case file:rename(FullPath, BrokenPath) of
         ok -> ok;
         {error, enoent} -> ok
     end.

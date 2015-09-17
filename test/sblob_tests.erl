@@ -454,7 +454,7 @@ test_recover(BaseName, Name, Uid) ->
     BaseDir = filename:absname("../test/data/broken"),
     AbsBaseName = filename:join(BaseDir, BaseName),
     AbsName = filename:join(BaseDir, Name),
-    BrokenName = Name ++ "." ++ Uid ++ ".broken",
+    BrokenName = "broken." ++ Name ++ "." ++ Uid,
 
     {ok, _} = file:copy(AbsBaseName, AbsName),
 
