@@ -40,7 +40,7 @@ close(#sblob{handle=nil}=Sblob) ->
     Sblob;
 close(#sblob{handle=Handle}=Sblob) ->
     lager:debug("close ~p", [lager:pr(Sblob, ?MODULE)]),
-    case file_handle_cache:close(Handle) of
+    case sblob_util:close_file(Handle) of
         ok -> ok;
         {error, einval} ->
             lager:warning("closing invalid file handle? ~p ~p", [Handle, lager:pr(Sblob, ?MODULE)])
@@ -62,16 +62,7 @@ put(#sblob{seqnum=SeqNum, index=Index, size=Size, name=Name}=Sblob, Timestamp, D
     {Handle, Sblob1} = sblob_util:get_handle(Sblob),
     NewSeqNum = SeqNum + 1,
     lager:debug("put ~s ~p ~p", [Name, NewSeqNum, Timestamp]),
-    Blob = sblob_util:to_binary(Timestamp, NewSeqNum, Data),
-    AllZerosBlob = <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0>>,
-
-    if Blob == AllZerosBlob ->
-           lager:warning("writing corrupt entry sblob: ~p sblob1: ~p seqnum: ~p, newseqnum: ~p, timestamp ~p data ~p",
-                         [lager:pr(Sblob), lager:pr(Sblob1), SeqNum, NewSeqNum, Timestamp, Data]),
-           throw(corrupted_entry);
-       true -> ok
-    end,
-    ok = file_handle_cache:append(Handle, Blob),
+    {ok, Blob} = sblob_util:file_append(Handle, Timestamp, NewSeqNum, Data),
 
     EntryOffset = Size,
     NewIndex = sblob_idx:put(Index, NewSeqNum, EntryOffset),

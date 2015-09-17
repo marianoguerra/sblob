@@ -2,16 +2,20 @@
 -export([parse_config/1, now/0, now_fast/0,
          get_handle/1, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
-         deep_size/1, recover/2,
+         deep_size/1, recover_move/2, recover/2,
          get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
          get_next/1, read_until/4,
+         open_file/2, open_read_file/1, close_file/1, file_append/4,
          to_binary/1, to_binary/3, from_binary/1, header_from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
 -include("sblob.hrl").
 
 -include_lib("kernel/include/file.hrl").
+
+-record(recover_st, {last_seqnum=nil, read_bytes=0, entry_count=0, handle,
+                    total_bytes, uid}).
 
 % it makes no sense to use erlang:now() since we are dividing by 1000
 now() -> now_fast().
@@ -54,6 +58,22 @@ open_file(Path, _ReadAhead, file) ->
     % TODO: see last opetions to open
     {ok, Handle} = file:open(Path, [raw, binary, read, append]),
     Handle.
+
+open_read_file(Path) ->
+    file_handle_cache:open(Path, [raw, binary, read], []).
+
+close_file(Handle) ->
+    file_handle_cache:close(Handle).
+
+file_size(Path, file_handle_cache) ->
+    {ok, Handle} = open_read_file(Path),
+    {ok, TotalBytes} = file_handle_cache:position(Handle, eof),
+    close_file(Handle),
+    TotalBytes.
+
+file_append(Handle, Timestamp, NewSeqNum, Data) ->
+    Blob = to_binary(Timestamp, NewSeqNum, Data),
+    {file_handle_cache:append(Handle, Blob), Blob}.
 
 % return the file handle to the current chunk, if not open already open it
 % and store it in the returned Sblob record
@@ -334,7 +354,8 @@ do_fold(Handle, Fun, Acc0) ->
 % {stop, AccEnd} | {eof, AccEnd} | {error, Reason, LastAccIn}
 % depending on how it stopped processing
 fold(Path, ChunkName, Opts, Fun, Acc0) ->
-    ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
+    ReadAhead = proplists:get_value(read_ahead, Opts,
+                                    ?SBLOB_DEFAULT_READ_AHEAD),
     SblobPath = filename:join([Path, ChunkName]),
     Handle = open_file(SblobPath, ReadAhead, file),
     do_fold(Handle, Fun, Acc0).
@@ -371,17 +392,91 @@ get_blob_info(BasePath, Name, Index) ->
     case file:read_file_info(FullPath, [{time, posix}]) of
         {ok, FileInfo} ->
             #file_info{size=Size, mtime=MTime} = FileInfo,
-            #sblob_info{path=FullPath, name=Name, index=Index, size=Size, mtime=MTime};
+            #sblob_info{path=FullPath, name=Name, index=Index, size=Size,
+                        mtime=MTime};
         {error, enoent} ->
             #sblob_info{path=FullPath, name=Name, index=Index, size=0, mtime=0}
     end.
 
-recover(#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
-    lager:warning("recover at the moment moves faulty block ~p: ~p",
-                  [Name, Path]),
+recover_move(#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
+    lager:info("recover: move faulty block ~p: ~p", [Name, Path]),
     BrokenName = "broken." ++ Name ++ "." ++ Uid,
     BrokenPath = filename:join(Path, BrokenName),
     case file:rename(FullPath, BrokenPath) of
         ok -> ok;
         {error, enoent} -> ok
     end.
+
+recover_fold_fun(#sblob_entry{timestamp=Ts, seqnum=SeqNum, size=Size,
+                              offset=Offset, data=Data},
+                 State=#recover_st{last_seqnum=LastSeqNum,
+                                   handle=Handle,
+                                   entry_count=CurCount,
+                                   read_bytes=CurSize}) ->
+    NewSize = CurSize + Size,
+    if LastSeqNum =/= nil andalso SeqNum =/= (LastSeqNum + 1) ->
+           Reason = {bad_seqnum, {last, LastSeqNum, seqnum, SeqNum}},
+           {stop, {error, Reason, State}};
+       Offset < 0 ->
+           Reason = {bad_offset, Offset},
+           {stop, {error, Reason, State}};
+       Ts < 0 ->
+           Reason = {bad_timestamp, Ts},
+           {stop, {error, Reason, State}};
+       true ->
+           case file_append(Handle, Ts, SeqNum, Data) of
+               {ok, _Blob} ->
+                   NewState = State#recover_st{last_seqnum=SeqNum,
+                                               entry_count=CurCount + 1,
+                                               read_bytes=NewSize},
+                   {continue, NewState};
+               Error ->
+                   {stop, {error, Error, State}}
+           end
+    end.
+
+log_recover_state(#recover_st{last_seqnum=LastSeqNum,
+                              entry_count=Count,
+                              read_bytes=ReadBytes,
+                              total_bytes=TotalBytes},
+                 StopReason) ->
+    lager:info("recovered ~p entries, last seqnum ~p, ~p bytes from ~p, end by ~p",
+               [Count, LastSeqNum, ReadBytes, TotalBytes, StopReason]).
+
+do_recover(Path, Name, FoldOpts, RecoverState) ->
+    case fold(Path, Name, FoldOpts, fun recover_fold_fun/2, RecoverState) of
+        {stop, {error, Reason, EndState}} ->
+            log_recover_state(EndState, Reason);
+        {eof, EndState} ->
+            log_recover_state(EndState, eof);
+        {error, Reason, EndState} ->
+            log_recover_state(EndState, Reason)
+    end.
+
+recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name},
+                       Uid) ->
+    RecoverName = "recover." ++ Name ++ "." ++ Uid,
+    RecoverPath = filename:join(Path, RecoverName),
+
+    Handle = open_file(RecoverPath, nil, file_handle_cache),
+    TotalBytes = file_size(FullPath, file_handle_cache),
+
+    State0 = #recover_st{handle=Handle, total_bytes=TotalBytes, uid=Uid},
+    try 
+        do_recover(Path, Name, [], State0),
+        case file:rename(RecoverPath, FullPath) of
+            ok -> ok;
+            Error ->
+                lager:warning("Error moving recovered file: ~p", [Error]),
+                ok
+        end
+    catch
+        EType:EReason ->
+            lager:warning("Error trying to recover file ~p: ~p ~p, truncating",
+                          [FullPath, EType, EReason])
+    after
+        close_file(Handle),
+        recover_move(Sblob, Uid)
+    end.
+
+
