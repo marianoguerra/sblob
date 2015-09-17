@@ -430,3 +430,22 @@ run_emply_plan_test() ->
     ?assertEqual(0, RemSize),
     ?assertEqual(0, RemCount),
     ?assertEqual([], Errors).
+
+fold_fun({_, _Ts, _Sn, _Ln, _Data, _Os, Sz}, CurSize) ->
+    NewSize = CurSize + Sz,
+    {continue, NewSize}.
+
+fold_error_first_truncated_test() ->
+    Gblob = gblob:open("../test/data/broken/first-broken-truncated", []),
+    R = gblob_util:fold(Gblob, [], fun fold_fun/2, 0),
+    ?assertEqual({error,{short_read,{expected,6,got,5}},217134}, R).
+
+fold_error_second_truncated_test() ->
+    Gblob = gblob:open("../test/data/broken/second-broken-truncated", []),
+    R = gblob_util:fold(Gblob, [], fun fold_fun/2, 0),
+    ?assertEqual({error,{short_read,{expected,32,got,31}},440938}, R).
+
+fold_error_last_truncated_test() ->
+    Gblob = gblob:open("../test/data/broken/last-broken-truncated", []),
+    R = gblob_util:fold(Gblob, [], fun fold_fun/2, 0),
+    ?assertEqual({error,{short_read,{expected,8,got,7}},441263}, R).

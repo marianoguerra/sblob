@@ -330,7 +330,8 @@ do_fold(Handle, Fun, Acc0) ->
 % if it should continue or stop
 % Fun = fun((Elem :: T, AccIn) -> Res)
 % Res = {stop, AccOut} | {continue, AccOut}
-% it will return a tagged tuple with one of {stop, AccEnd} | {eof, AccEnd}
+% it will return a tagged tuple with one of
+% {stop, AccEnd} | {eof, AccEnd} | {error, Reason, LastAccIn}
 % depending on how it stopped processing
 fold(Path, ChunkName, Opts, Fun, Acc0) ->
     ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),

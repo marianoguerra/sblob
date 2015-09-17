@@ -301,7 +301,8 @@ do_fold(Fun, AccIn, [H|T]) ->
 % if it should continue or stop
 % Fun = fun((Elem :: T, AccIn) -> Res)
 % Res = {stop, AccOut} | {continue, AccOut}
-% it will return a tagged tuple with one of {stop, AccEnd} | {eof, AccEnd}
+% it will return a tagged tuple with one of
+% {stop, AccEnd} | {eof, AccEnd} | {error, Reason, LastAccIn}
 % depending on how it stopped processing
 fold(Gblob=#gblob{path=Path, min_chunk_num=nil, max_chunk_num=nil},
      Opts, Fun, Acc0) ->
