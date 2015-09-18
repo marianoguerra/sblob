@@ -245,6 +245,9 @@ do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
                            end,
                 Gblob2 = Gblob1#gblob{index=NewIndex},
                 {Gblob2, R2, SeqNum + Rc2, Rc2};
+            {error, enoent} ->
+                % a sblob missing is not an error, it might be evicted
+                {Gblob1, [], SeqNum, 0};
             {error, Reason} ->
                 lager:error("error in chunk seqread ~p ~p ~p: ~p",
                             [Path, ChunkName, ChunkNum, Reason]),
