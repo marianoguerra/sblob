@@ -6,7 +6,7 @@
          get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
          read_until/4,
-         open_file/2, open_read_file/1, close_file/1, file_append/4,
+         file_append/4, close_file/1,
          to_binary/1, to_binary/3, from_binary/1,
          blob_size/1, offset_for_seqnum/2, fill_bounds/1]).
 
@@ -45,18 +45,9 @@ parse_config([], Config) ->
     Config.
 
 open_file(Path, _ReadAhead) ->
-    open_file(Path, _ReadAhead, file_handle_cache).
-
-open_file(Path, _ReadAhead, file_handle_cache) ->
     % XXX ignore ReadAhead for now since not on file_handle_cache
     % TODO: see last options to open
     {ok, Handle} = file_handle_cache:open(Path, [raw, binary, read, append], []),
-    Handle;
-
-open_file(Path, _ReadAhead, file) ->
-    % XXX ignore ReadAhead for now since not on file_handle_cache
-    % TODO: see last opetions to open
-    {ok, Handle} = file:open(Path, [raw, binary, read, append]),
     Handle.
 
 open_read_file(Path) ->
@@ -65,7 +56,7 @@ open_read_file(Path) ->
 close_file(Handle) ->
     file_handle_cache:close(Handle).
 
-file_size(Path, file_handle_cache) ->
+file_size(Path) ->
     {ok, Handle} = open_read_file(Path),
     {ok, TotalBytes} = file_handle_cache:position(Handle, eof),
     close_file(Handle),
@@ -184,7 +175,7 @@ read(#sblob{position=Pos, handle=Handle}=Sblob, Len) ->
     end.
 
 raw_read(Handle, Len) ->
-    case check_read(file:read(Handle, Len), Len) of
+    case check_read(file_handle_cache:read(Handle, Len), Len) of
         {ok, Data} -> {ok, Handle, Data};
         Other -> Other
     end.
@@ -235,7 +226,7 @@ raw_get_next(Handle) ->
              % For now we don't fill this field
              EntryOffset = nil,
              get_next_from_header(Header, EntryOffset, Handle,
-                                  fun raw_read/2, fun file:close/1);
+                                  fun raw_read/2, fun file_handle_cache:close/1);
          Other -> Other
      end.
 
@@ -401,26 +392,28 @@ seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, nil, _, Count, 
 seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, FirstSeqNum, _, Count, MaxCount, MinSeqNum}) ->
     {continue, {[Entry|Items], FirstSeqNum, EntrySeqNum, Count + 1, MaxCount, MinSeqNum}}.
 
-seqread(Path, ChunkName, SeqNum, Count, Opts) ->
+seqread(Path, ChunkName, SeqNum, Count, _Opts) ->
     lager:debug("seqread ~s ~p ~p", [ChunkName, SeqNum, Count]),
     SblobPath = filename:join([Path, ChunkName]),
-    ReadAhead = proplists:get_value(read_ahead, Opts, ?SBLOB_DEFAULT_READ_AHEAD),
-    Handle = open_file(SblobPath, ReadAhead, file),
-    FoldFun = fun seqread_fold_fun/2,
-    AccOut = case do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}) of
-                 {_, AccOut0} -> AccOut0;
-                 {error, Reason, AccOut0} ->
-                     lager:error("in seqread ~p: ~p", [SblobPath, Reason]),
-                     AccOut0
-             end,
+    case open_read_file(SblobPath) of
+        {ok, Handle} ->
+            FoldFun = fun seqread_fold_fun/2,
+            AccOut = case do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}) of
+                         {_, AccOut0} -> AccOut0;
+                         {error, Reason, AccOut0} ->
+                             lager:error("in seqread ~p: ~p", [SblobPath, Reason]),
+                             AccOut0
+                     end,
 
-    {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
-    {lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount}.
+            {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
+            {lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount};
+        Other -> Other
+    end.
 
 do_fold(Handle, Fun, Acc0) ->
     case raw_get_next(Handle) of
         {error, eof} ->
-            file:close(Handle),
+            file_handle_cache:close(Handle),
             {eof, Acc0};
 
         {ok, {_Handle, Entry}} ->
@@ -429,7 +422,7 @@ do_fold(Handle, Fun, Acc0) ->
                     do_fold(Handle, Fun, Acc1);
 
                 {stop, _AccEnd}=Res -> 
-                    file:close(Handle),
+                    file_handle_cache:close(Handle),
                     Res
             end;
         {error, Reason} ->
@@ -443,12 +436,13 @@ do_fold(Handle, Fun, Acc0) ->
 % it will return a tagged tuple with one of
 % {stop, AccEnd} | {eof, AccEnd} | {error, Reason, LastAccIn}
 % depending on how it stopped processing
-fold(Path, ChunkName, Opts, Fun, Acc0) ->
-    ReadAhead = proplists:get_value(read_ahead, Opts,
-                                    ?SBLOB_DEFAULT_READ_AHEAD),
+fold(Path, ChunkName, _Opts, Fun, Acc0) ->
     SblobPath = filename:join([Path, ChunkName]),
-    Handle = open_file(SblobPath, ReadAhead, file),
-    do_fold(Handle, Fun, Acc0).
+    case open_read_file(SblobPath) of
+        {ok, Handle} -> do_fold(Handle, Fun, Acc0);
+        {error, Reason} ->
+            {error, Reason, Acc0}
+    end.
 
 % sub_file and remove_recursive adapted from 
 % https://github.com/erlware/erlware_commons/blob/master/src/ec_file.erl
@@ -547,8 +541,8 @@ recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name},
     RecoverName = "recover." ++ Name ++ "." ++ Uid,
     RecoverPath = filename:join(Path, RecoverName),
 
-    Handle = open_file(RecoverPath, nil, file_handle_cache),
-    TotalBytes = file_size(FullPath, file_handle_cache),
+    Handle = open_file(RecoverPath, nil),
+    TotalBytes = file_size(FullPath),
 
     State0 = #recover_st{handle=Handle, total_bytes=TotalBytes, uid=Uid},
     try 

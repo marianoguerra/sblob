@@ -244,7 +244,11 @@ do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
                                   sblob_idx:put(Index, ChunkNum, FirstSeqNum)
                            end,
                 Gblob2 = Gblob1#gblob{index=NewIndex},
-                {Gblob2, R2, SeqNum + Rc2, Rc2}
+                {Gblob2, R2, SeqNum + Rc2, Rc2};
+            {error, Reason} ->
+                lager:error("error in chunk seqread ~p ~p ~p: ~p",
+                            [Path, ChunkName, ChunkNum, Reason]),
+                {Gblob1, [], SeqNum, 0}
         end,
     NewAccum = [Result|Accum],
     NewCount = Count - ReadCount,
