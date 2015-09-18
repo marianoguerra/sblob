@@ -288,14 +288,22 @@ get_next(Sblob) ->
         Error -> Error
     end.
 
-get_first(#sblob{fullpath=FullPath}=Sblob) ->
-    lager:debug("get_first ~s", [FullPath]),
-    {ok, NewSblob} = seek(Sblob, bof),
-    case get_next(NewSblob) of
+get_next_add_sblob(Sblob) ->
+    case get_next(Sblob) of
         {error, Reason} ->
-            {error, Reason, NewSblob};
+            {error, Reason, Sblob};
         {ok, {_SblobOut, _Entry}} = Res -> Res
     end.
+
+seek_and_get_next(Sblob, Position) ->
+    case seek(Sblob, Position) of
+        {ok, Sblob1} -> get_next_add_sblob(Sblob1);
+        {error, Error, _Sblob1} -> {error, {seek_error, Error}}
+    end.
+
+get_first(#sblob{fullpath=FullPath}=Sblob) ->
+    lager:debug("get_first ~s", [FullPath]),
+    seek_and_get_next(Sblob, bof).
 
 get_last(#sblob{fullpath=FullPath}=Sblob) ->
     lager:debug("get_last ~s", [FullPath]),
@@ -312,15 +320,8 @@ get_last(#sblob{fullpath=FullPath}=Sblob) ->
 
             Offset = blob_size(EntryDataLen),
 
-            case seek(Sblob2#sblob{size=SblobSize}, {cur, -Offset}) of
-                {ok, Sblob3} ->
-                    case get_next(Sblob3) of
-                        {error, _Reason}=Error -> Error;
-                        {ok, {_SblobOut, _Entry}} = Result -> Result
-                    end;
-
-                {error, Error, _Sblob3} -> {error, {seek_error, Error}}
-            end;
+            Sblob3 = Sblob2#sblob{size=SblobSize},
+            seek_and_get_next(Sblob3, {cur, -Offset});
         {error, Error, _Sblob1} ->
             {error, {seek_error, Error}}
     end.
@@ -482,13 +483,22 @@ recover_move(#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
         {error, enoent} -> ok
     end.
 
-recover_fold_fun(#sblob_entry{timestamp=Ts, seqnum=SeqNum, size=Size,
-                              offset=Offset, data=Data},
-                 State=#recover_st{last_seqnum=LastSeqNum,
-                                   handle=Handle,
-                                   entry_count=CurCount,
-                                   read_bytes=CurSize}) ->
-    NewSize = CurSize + Size,
+recover_append(#sblob_entry{timestamp=Ts, seqnum=SeqNum, size=Size, data=Data},
+               State=#recover_st{handle=Handle, entry_count=CurCount,
+                                 read_bytes=CurSize}) ->
+    case file_append(Handle, Ts, SeqNum, Data) of
+        {ok, _Blob} ->
+            NewSize = CurSize + Size,
+            NewState = State#recover_st{last_seqnum=SeqNum,
+                                        entry_count=CurCount + 1,
+                                        read_bytes=NewSize},
+            {continue, NewState};
+        Error ->
+            {stop, {error, Error, State}}
+    end.
+
+recover_fold_fun(Sblob=#sblob_entry{timestamp=Ts, seqnum=SeqNum, offset=Offset},
+                 State=#recover_st{last_seqnum=LastSeqNum}) ->
     if LastSeqNum =/= nil andalso SeqNum =/= (LastSeqNum + 1) ->
            Reason = {bad_seqnum, {last, LastSeqNum, seqnum, SeqNum}},
            {stop, {error, Reason, State}};
@@ -499,21 +509,11 @@ recover_fold_fun(#sblob_entry{timestamp=Ts, seqnum=SeqNum, size=Size,
            Reason = {bad_timestamp, Ts},
            {stop, {error, Reason, State}};
        true ->
-           case file_append(Handle, Ts, SeqNum, Data) of
-               {ok, _Blob} ->
-                   NewState = State#recover_st{last_seqnum=SeqNum,
-                                               entry_count=CurCount + 1,
-                                               read_bytes=NewSize},
-                   {continue, NewState};
-               Error ->
-                   {stop, {error, Error, State}}
-           end
+           recover_append(Sblob, State)
     end.
 
-log_recover_state(#recover_st{last_seqnum=LastSeqNum,
-                              entry_count=Count,
-                              read_bytes=ReadBytes,
-                              total_bytes=TotalBytes},
+log_recover_state(#recover_st{last_seqnum=LastSeqNum, entry_count=Count,
+                              read_bytes=ReadBytes, total_bytes=TotalBytes},
                  StopReason) ->
     lager:info("recovered ~p entries, last seqnum ~p, ~p bytes from ~p, end by ~p",
                [Count, LastSeqNum, ReadBytes, TotalBytes, StopReason]).
