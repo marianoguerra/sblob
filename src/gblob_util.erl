@@ -318,7 +318,11 @@ fold(#gblob{path=Path, min_chunk_num=MinChunkNum, max_chunk_num=MaxChunkNum},
      Opts, Fun, Acc0) ->
 
     % add nil so the current chunk is also folded
-    Nums = lists:seq(MinChunkNum, MaxChunkNum) ++ [nil],
+    Nums = case {MinChunkNum, MaxChunkNum} of
+               {A, A}  -> [nil];
+               {A, B} when A == 0 -> lists:seq(A + 1, B) ++ [nil];
+               {A, B} -> lists:seq(A, B) ++ [nil]
+           end,
     do_fold(fun (ChunkNum, AccIn) ->
                     ChunkName = chunk_name(ChunkNum),
                     sblob_util:fold(Path, ChunkName, Opts, Fun, AccIn)
