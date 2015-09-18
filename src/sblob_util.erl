@@ -2,7 +2,7 @@
 -export([parse_config/1, now/0, now_fast/0,
          get_handle/1, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
-         deep_size/1, recover_move/2, recover/2,
+         deep_size/1, recover_move/2, recover/2, recover_from_path/2,
          get_blob_info/3,
          handle_get_one/1, seqread/5, fold/5,
          read_until/4,
@@ -362,8 +362,7 @@ read_until(Sblob=#sblob{fullpath=FullPath}, CurSeqNum, TargetSeqNum, Accumulate,
             % so we set it to nil here:
             % TODO: we should signal there was an error here
             NewSblob = Sblob#sblob{handle=nil},
-            Uid = integer_to_list(sblob_util:now()),
-            ok = sblob_util:recover(NewSblob, Uid),
+            ok = recover(NewSblob),
             {NewSblob, CurSeqNum, lists:reverse(Accum)}
     end.
 
@@ -398,15 +397,15 @@ seqread(Path, ChunkName, SeqNum, Count, _Opts) ->
     case open_read_file(SblobPath) of
         {ok, Handle} ->
             FoldFun = fun seqread_fold_fun/2,
-            AccOut = case do_fold(Handle, FoldFun, {[], nil, nil, 0, Count, SeqNum}) of
-                         {_, AccOut0} -> AccOut0;
-                         {error, Reason, AccOut0} ->
-                             lager:error("in seqread ~p: ~p", [SblobPath, Reason]),
-                             AccOut0
-                     end,
+            Acc0 = {[], nil, nil, 0, Count, SeqNum},
+            {R, AccOut} = case do_fold(Handle, FoldFun, Acc0) of
+                              {_, AccOut0} -> {ok, AccOut0};
+                              {error, Reason, AccOut0} ->
+                                  {{error, Reason}, AccOut0}
+                          end,
 
             {Items, FirstSeqNum, LastSeqNum, ItemsCount, _, _} = AccOut,
-            {lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount};
+            {R, lists:reverse(Items), FirstSeqNum, LastSeqNum, ItemsCount};
         Other -> Other
     end.
 
@@ -536,8 +535,15 @@ do_recover(Path, Name, FoldOpts, RecoverState) ->
             log_recover_state(EndState, Reason)
     end.
 
-recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name},
-                       Uid) ->
+recover(Sblob) ->
+    Uid = integer_to_list(sblob_util:now()),
+    recover(Sblob, Uid).
+
+recover_from_path(Path, Name) ->
+    FullPath = filename:join(Path, Name),
+    recover(#sblob{path=Path, name=Name, fullpath=FullPath}).
+
+recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
     RecoverName = "recover." ++ Name ++ "." ++ Uid,
     RecoverPath = filename:join(Path, RecoverName),
 

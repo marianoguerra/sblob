@@ -232,11 +232,11 @@ get_index(#gblob{index=Index}=Gblob) ->
 
 do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
     {Gblob1, Index} = get_index(Gblob),
-    {NewGblob, Result, NewSeqNum, ReadCount} =
+    {RType, NewGblob, Result, NewSeqNum, ReadCount} =
         case sblob_util:seqread(Path, ChunkName, SeqNum, Count, ReadAhead) of
-            {R1, nil, nil, Rc1} ->
-                {Gblob1, R1, SeqNum + Rc1, Rc1};
-            {R2, FirstSeqNum, _LastSeqNum, Rc2} ->
+            {RType1, R1, nil, nil, Rc1} ->
+                {RType1, Gblob1, R1, SeqNum + Rc1, Rc1};
+            {RType2, R2, FirstSeqNum, _LastSeqNum, Rc2} ->
                 % ignore bounds of the current chunk
                 NewIndex = if ChunkNum == 0 ->
                                   Index;
@@ -244,17 +244,24 @@ do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
                                   sblob_idx:put(Index, ChunkNum, FirstSeqNum)
                            end,
                 Gblob2 = Gblob1#gblob{index=NewIndex},
-                {Gblob2, R2, SeqNum + Rc2, Rc2};
+                {RType2, Gblob2, R2, SeqNum + Rc2, Rc2};
             {error, enoent} ->
                 % a sblob missing is not an error, it might be evicted
-                {Gblob1, [], SeqNum, 0};
-            {error, Reason} ->
+                {ok, Gblob1, [], SeqNum, 0};
+            {error, Reason}=E1 ->
                 lager:error("error in chunk seqread ~p ~p ~p: ~p",
                             [Path, ChunkName, ChunkNum, Reason]),
-                {Gblob1, [], SeqNum, 0}
+                {E1, Gblob1, [], SeqNum, 0}
         end,
     NewAccum = [Result|Accum],
     NewCount = Count - ReadCount,
+    case RType of
+        ok -> ok;
+        {error, RReason} ->
+            lager:warning("error in sblob:seqread, attempting recover ~p/~p.~p: ~p", 
+                          [Path, ChunkName, ChunkNum, RReason]),
+            sblob_util:recover_from_path(Path, ChunkName)
+    end,
     if
         ChunkNum > 0 ->
             seqread(NewGblob, ChunkNum + 1, NewSeqNum, NewCount, ReadAhead, NewAccum);
