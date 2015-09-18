@@ -215,44 +215,23 @@ offset_for_seqnum(#sblob{index=Idx}, SeqNum) ->
 raw_get_next(Handle) ->
      case file:read(Handle, ?SBLOB_HEADER_SIZE_BYTES) of
          {ok, Header} ->
-             case header_from_binary(Header) of
-                 {ok, HeaderEntry} ->
-                     Len = HeaderEntry#sblob_entry.len,
-                     Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
-                     TailLen = Len + Shlsb,
-                     {ok, Tail} = file:read(Handle, TailLen),
-                     ActualTailLen = size(Tail),
-
-                     if TailLen =:= ActualTailLen ->
-                            <<Data:Len/binary, TailLenVal:32/integer>> = Tail,
-
-                            if TailLenVal =:= Len ->
-                                   EntrySize = ?SBLOB_HEADER_SIZE_BYTES + TailLen,
-                                   Entry = HeaderEntry#sblob_entry{data=Data,
-                                                                   size=EntrySize},
-                                   {ok, Entry};
-                               true ->
-                                   {error, {corrupt_len_field, {Len, TailLenVal}}}
-                            end;
-                        true ->
-                            {error, {short_read,
-                                     {expected, TailLen, got, ActualTailLen}}}
-                     end;
-                {error, _Reason}=Error -> Error
-             end;
+             % For now we don't fill this field
+             EntryOffset = nil,
+             get_next_from_header(Header, EntryOffset, Handle,
+                                  fun raw_read/2, fun file:close/1);
          eof -> eof
      end.
 
-get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {ok, {Sblob, notfound}};
+raw_read(Handle, Len) ->
+    {Handle, file:read(Handle, Len)}.
 
-get_next(Sblob) ->
-    {Sblob1, {ok, Header}} = read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
+get_next_from_header(Header, EntryOffset, Input, ReadFun, CloseFun) ->
     case header_from_binary(Header) of
         {ok, HeaderEntry} ->
             Len = HeaderEntry#sblob_entry.len,
             Shlsb = ?SBLOB_HEADER_LEN_SIZE_BYTES,
             TailLen = Len + Shlsb,
-            {Sblob2, {ok, Tail}} = read(Sblob1, TailLen),
+            {Input1, {ok, Tail}} = ReadFun(Input, TailLen),
             ActualTailLen = size(Tail),
 
             if TailLen =:= ActualTailLen ->
@@ -260,32 +239,46 @@ get_next(Sblob) ->
 
                    if TailLenVal =:= Len ->
                           EntrySize = ?SBLOB_HEADER_SIZE_BYTES + TailLen,
-                          EntryOffset = Sblob#sblob.position,
                           Entry = HeaderEntry#sblob_entry{data=Data,
                                                           offset=EntryOffset,
                                                           size=EntrySize},
 
-                          BlobSeqNum = Entry#sblob_entry.seqnum,
-                          Index = Sblob2#sblob.index,
-                          NewIndex = if Index == nil -> Index;
-                                        true ->
-                                            sblob_idx:put(Index,
-                                                          BlobSeqNum,
-                                                          EntryOffset)
-                                     end,
-                          Sblob3 = Sblob2#sblob{index=NewIndex},
-
-                          {ok, {Sblob3, Entry}};
+                          {ok, {Input1, Entry}};
                       true ->
-                          sblob:close(Sblob2),
+                          CloseFun(Input1),
                           {error, {corrupt_len_field, {Len, TailLenVal}}}
                    end;
                true ->
-                   sblob:close(Sblob2),
+                   CloseFun(Input1),
                    {error, {short_read,
                             {expected, TailLen, got, ActualTailLen}}}
             end;
-        Error -> Error
+        {error, _Reason}=Error ->
+            CloseFun(Input),
+            Error
+    end.
+
+update_index_with_entry(Sblob, Entry=#sblob_entry{offset=EntryOffset}) ->
+    BlobSeqNum = Entry#sblob_entry.seqnum,
+    Index = Sblob#sblob.index,
+    NewIndex = if Index == nil ->
+                      Index;
+                  true ->
+                      sblob_idx:put(Index, BlobSeqNum, EntryOffset)
+               end,
+    Sblob#sblob{index=NewIndex}.
+
+get_next(#sblob{position=Pos, size=Pos}=Sblob) -> {ok, {Sblob, notfound}};
+
+get_next(Sblob) ->
+    {Sblob1, {ok, Header}} = read(Sblob, ?SBLOB_HEADER_SIZE_BYTES),
+    EntryOffset = Sblob#sblob.position,
+    case get_next_from_header(Header, EntryOffset, Sblob1,
+                              fun read/2, fun sblob:close/1) of
+        {ok, {Sblob2, Entry}} ->
+            Sblob3 = update_index_with_entry(Sblob2, Entry),
+            {ok, {Sblob3, Entry}};
+        {error, _Reason} = Error -> Error
     end.
 
 get_next_add_sblob(Sblob) ->
@@ -408,7 +401,7 @@ do_fold(Handle, Fun, Acc0) ->
             file:close(Handle),
             {eof, Acc0};
 
-        {ok, Entry} ->
+        {ok, {_Handle, Entry}} ->
             case Fun(Entry, Acc0) of
                 {continue, Acc1} ->
                     do_fold(Handle, Fun, Acc1);
@@ -418,7 +411,6 @@ do_fold(Handle, Fun, Acc0) ->
                     Res
             end;
         {error, Reason} ->
-            file:close(Handle),
             {error, Reason, Acc0}
     end.
 
