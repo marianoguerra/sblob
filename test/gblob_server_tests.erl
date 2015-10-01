@@ -21,7 +21,8 @@ usage_test_() ->
       fun write_100_read_middle_50/1,
       fun write_100_read_last_50/1,
       fun write_100_read_some_50/1,
-      fun write_100_read_some/1
+      fun write_100_read_some/1,
+      fun write_delete/1
      ]}.
 
 new_gblob_server(ServerOpts) ->
@@ -177,4 +178,9 @@ assert_entry(#sblob_entry{data=Data, seqnum=SeqNum, len=Len}, EData, ESeqNum) ->
     [?_assertEqual(EData, Data),
      ?_assertEqual(ESeqNum, SeqNum),
      ?_assertEqual(size(Data), Len)].
+
+write_delete(Gblob) ->
+    write_many(Gblob, 99),
+    Res = gblob_server:delete(Gblob),
+    ?assertEqual(ok, Res).
 
