@@ -478,7 +478,7 @@ clear(Ref) ->
       end).
 
 set_maximum_since_use(MaximumAge) ->
-    Now = now(),
+    Now = os:timestamp(),
     case lists:foldl(
            fun ({{Ref, fhc_handle},
                  Handle = #handle { hdl = Hdl, last_used_at = Then }}, Rep) ->
@@ -586,7 +586,7 @@ get_or_reopen(RefNewOrReopens) ->
         {OpenHdls, []} ->
             {ok, [Handle || {_Ref, Handle} <- OpenHdls]};
         {OpenHdls, ClosedHdls} ->
-            Oldest = oldest(get_age_tree(), fun () -> now() end),
+            Oldest = oldest(get_age_tree(), fun () -> os:timestamp() end),
             case gen_server2:call(?SERVER, {open, self(), length(ClosedHdls),
                                             Oldest}, infinity) of
                 ok ->
@@ -620,7 +620,7 @@ reopen([{Ref, NewOrReopen, Handle = #handle { hdl          = closed,
                                   reopen -> [read | Mode]
                               end) of
         {ok, Hdl} ->
-            Now = now(),
+            Now = os:timestamp(),
             {{ok, _Offset}, Handle1} =
                 maybe_seek(Offset, Handle #handle { hdl          = Hdl,
                                                     offset       = 0,
@@ -655,7 +655,7 @@ sort_handles([{Ref, _} | RefHdls], RefHdlsA, [{Ref, Handle} | RefHdlsB], Acc) ->
     sort_handles(RefHdls, RefHdlsA, RefHdlsB, [Handle | Acc]).
 
 put_handle(Ref, Handle = #handle { last_used_at = Then }) ->
-    Now = now(),
+    Now = os:timestamp(),
     age_tree_update(Then, Now, Ref),
     put({Ref, fhc_handle}, Handle #handle { last_used_at = Now }).
 
@@ -1188,7 +1188,7 @@ reduce(State = #fhc_state { open_pending          = OpenPending,
                             elders                = Elders,
                             clients               = Clients,
                             timer_ref             = TRef }) ->
-    Now = now(),
+    Now = os:timestamp(),
     {CStates, Sum, ClientCount} =
         ets:foldl(fun ({Pid, Eldest}, {CStatesAcc, SumAcc, CountAcc} = Accs) ->
                           [#cstate { pending_closes = PendingCloses,
