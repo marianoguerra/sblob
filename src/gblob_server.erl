@@ -16,6 +16,8 @@
                 max_interval_no_eviction_ms = 60000,
                 check_interval_ms=30000}).
 
+-define(CALL_TIMEOUT, 2000).
+
 %% Public API
 
 start_link(Path, GblobOpts) ->
@@ -34,19 +36,19 @@ close(Module) ->
     gen_server:call(Module, close).
 
 put(Pid, Data) ->
-    gen_server:call(Pid, {put, Data}).
+    gen_server:call(Pid, {put, Data}, ?CALL_TIMEOUT).
 
 put(Pid, Timestamp, Data) ->
-    gen_server:call(Pid, {put, Timestamp, Data}).
+    gen_server:call(Pid, {put, Timestamp, Data}, ?CALL_TIMEOUT).
 
 put(Pid, Timestamp, Data, LastSeqNum) ->
-    gen_server:call(Pid, {put, Timestamp, Data, LastSeqNum}).
+    gen_server:call(Pid, {put, Timestamp, Data, LastSeqNum}, ?CALL_TIMEOUT).
 
 get(Pid, SeqNum) ->
-    gen_server:call(Pid, {get, SeqNum}).
+    gen_server:call(Pid, {get, SeqNum}, ?CALL_TIMEOUT).
 
 get(Pid, SeqNum, Count) ->
-    gen_server:call(Pid, {get, SeqNum, Count}).
+    gen_server:call(Pid, {get, SeqNum, Count}, ?CALL_TIMEOUT).
 
 truncate(Pid, SizeBytes) ->
     gen_server:call(Pid, {truncate, SizeBytes}).
