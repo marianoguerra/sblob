@@ -33,7 +33,7 @@ new_gblob_server(ServerOpts) ->
 cleanup_on_inactivity_test() ->
     Server = new_gblob_server([{check_interval_ms, 1}]),
     timer:sleep(500),
-    {Active, LastActivity, LastEviction} = gblob_server:status(Server),
+    {Active, LastActivity, LastEviction, _} = gblob_server:status(Server),
     ?assertEqual(false, Active),
     ?assertEqual(true, LastEviction == 0),
     ?assertEqual(true, LastActivity > 0).
@@ -45,7 +45,7 @@ force_evict_on_inactivity_test() ->
     gblob_server:put(Server, Data1),
     timer:sleep(100),
     gblob_server:put(Server, Data2),
-    {Active, LastActivity, LastEviction} = gblob_server:status(Server),
+    {Active, LastActivity, LastEviction, _} = gblob_server:status(Server),
     ?assertEqual(true, Active),
     ?assertEqual(true, LastActivity > 0),
     ?assertEqual(true, LastEviction > 0).
@@ -53,11 +53,11 @@ force_evict_on_inactivity_test() ->
 set_active_on_action_after_cleanup_test() ->
     Server = new_gblob_server([{check_interval_ms, 100}]),
     timer:sleep(500),
-    {Active, LastActivity, _} = gblob_server:status(Server),
+    {Active, LastActivity, _, _} = gblob_server:status(Server),
     ?assertEqual(false, Active),
     ?assertEqual(true, LastActivity > 0),
     Item = gblob_server:get(Server, 42),
-    {Active1, LastActivity1, _} = gblob_server:status(Server),
+    {Active1, LastActivity1, _, _} = gblob_server:status(Server),
     StopResponse = gblob_server:stop(Server),
     ?assertEqual(notfound, Item),
     ?assertEqual(true, Active1),

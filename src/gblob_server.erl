@@ -89,9 +89,10 @@ handle_call(close, _From, State=#state{gblob=Gblob}) ->
     {reply, ok, NewState};
 
 handle_call(status, _From, State=#state{active=Active,
+                                        last_check=LastCheck,
                                         last_action=LastAction,
                                         last_eviction=LastEviction}) ->
-    {reply, {Active, LastAction, LastEviction}, State};
+    {reply, {Active, LastAction, LastEviction, LastCheck}, State};
 
 handle_call({put, Data}, _From, State=#state{gblob=Gblob}) ->
     Timestamp = sblob_util:now(),
