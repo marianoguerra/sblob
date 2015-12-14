@@ -13,7 +13,7 @@
                 last_check=0,
                 last_eviction=0,
                 active,
-                max_interval_no_eviction_ms = 60000,
+                max_interval_no_eviction_ms=60000,
                 % NOTE: since status is called every 60 secs (by default)
                 % for metrics if this is set to something above 60 secs it will
                 % never call do_check
@@ -178,7 +178,7 @@ check_eviction(State=#state{last_eviction=LastEviction,
                           LastEviction == 0 -> Now;
                           true -> LastEviction
                       end,
-    NewState = State#state{last_eviction=NewEvictionTime},
+    NewState = State#state{last_eviction=NewEvictionTime, last_check=Now},
     {ShouldEvict, NewState}.
 
 evict(Gblob, State) ->
@@ -216,12 +216,11 @@ do_check(State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=Che
     LastCheckTime = Now - CheckIntervalMs,
     ShouldClose = LastAction < LastCheckTime,
 
-    {NewActive, NewGblob} = if
-                                ShouldClose ->
-                                    lager:debug("closing inactive gblob ~s", [Path]),
-                                    {false, gblob:close(Gblob)};
-                                true ->
-                                    {true, Gblob}
+    {NewActive, NewGblob} = if ShouldClose ->
+                                   lager:debug("closing inactive gblob ~s", [Path]),
+                                   {false, gblob:close(Gblob)};
+                               true ->
+                                   {true, Gblob}
                             end,
 
     MaybeEvictedGblob = do_eviction(NewGblob),
