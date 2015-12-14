@@ -14,6 +14,9 @@
                 last_eviction=0,
                 active,
                 max_interval_no_eviction_ms = 60000,
+                % NOTE: since status is called every 60 secs (by default)
+                % for metrics if this is set to something above 60 secs it will
+                % never call do_check
                 check_interval_ms=30000}).
 
 -define(CALL_TIMEOUT, 2000).
@@ -92,7 +95,8 @@ handle_call(status, _From, State=#state{active=Active,
                                         last_check=LastCheck,
                                         last_action=LastAction,
                                         last_eviction=LastEviction}) ->
-    {reply, {Active, LastAction, LastEviction, LastCheck}, State};
+    {reply, {Active, LastAction, LastEviction, LastCheck}, State,
+     State#state.check_interval_ms};
 
 handle_call({put, Data}, _From, State=#state{gblob=Gblob}) ->
     Timestamp = sblob_util:now(),
@@ -123,7 +127,7 @@ handle_call({truncate_percentage, Percentage}, _From, State=#state{gblob=Gblob})
 handle_call(size, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Size} = gblob:size(Gblob),
     NewState = update_gblob(State, NewGblob),
-    {reply, Size, NewState};
+    {reply, Size, NewState, State#state.check_interval_ms};
 
 handle_call({truncate, SizeBytes}, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Result} = gblob:truncate(Gblob, SizeBytes),
@@ -132,20 +136,20 @@ handle_call({truncate, SizeBytes}, _From, State=#state{gblob=Gblob}) ->
 
 handle_cast(Msg, State) ->
     io:format("Unexpected handle cast message: ~p~n",[Msg]),
-    {noreply, State}.
+    {noreply, State, State#state.check_interval_ms}.
 
 handle_info(timeout, State=#state{active=false}) ->
-   {noreply, State};
+    {noreply, State};
 
 handle_info(timeout, State) ->
-    {noreply, do_check(State)};
+    {noreply, do_check(State), State#state.check_interval_ms};
 
 handle_info(evict, State=#state{gblob=Gblob}) ->
-    {noreply, evict(Gblob, State)};
+    {noreply, evict(Gblob, State), State#state.check_interval_ms};
 
 handle_info(Msg, State) ->
     io:format("Unexpected handle info message: ~p~n",[Msg]),
-    {noreply, State}.
+    {noreply, State, State#state.check_interval_ms}.
 
 
 terminate(_Reason, _Gblob) ->
