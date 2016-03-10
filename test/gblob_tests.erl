@@ -9,7 +9,9 @@ usage_test_() ->
     {foreach,
      fun usage_start/0,
      fun usage_stop/1,
-     [fun do_nothing/1,
+     [fun write_100_read_first_10_negative_seqnum/1,
+      fun write_100_read_first_10_negative_seqnum_before_start/1,
+      fun do_nothing/1,
       fun only_reopen/1,
       fun write_expect_last_seqnum/1,
       fun write_100_empty_blobs/1,
@@ -166,6 +168,20 @@ write_100_read_1(Gblob) ->
     Gblob1 = write_many(Gblob, 100),
     {_Gblob2, E1} = gblob:get(Gblob1, 48),
     [assert_entry(E1, <<"item 47">>, 48)].
+
+write_100_read_first_10_negative_seqnum(Gblob) ->
+    Gblob1 = write_many(Gblob, 100),
+    {_Gblob2, Entries} = gblob:get(Gblob1, -100, 10),
+    [E1|_] = Entries,
+    [?_assertEqual(10, length(Entries)),
+     assert_entry(E1, <<"item 0">>, 1)].
+
+write_100_read_first_10_negative_seqnum_before_start(Gblob) ->
+    Gblob1 = write_many(Gblob, 100),
+    {_Gblob2, Entries} = gblob:get(Gblob1, -200, 10),
+    [E1|_] = Entries,
+    [?_assertEqual(10, length(Entries)),
+     assert_entry(E1, <<"item 0">>, 1)].
 
 read_N(Gblob, StartSN, ReadCount) ->
     read_N(Gblob, StartSN, ReadCount, false).

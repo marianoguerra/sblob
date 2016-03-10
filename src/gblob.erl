@@ -95,7 +95,17 @@ get(Gblob, nil, Count) ->
 
     get(Gblob1, SeqNum1, Count);
 
+get(Gblob, SeqNum, Count) when is_integer(SeqNum) andalso SeqNum < 0 ->
+    ?debugFmt("get neg seqnum ~p ~p", [SeqNum, Count]),
+    {Gblob1, Sblob} = gblob_util:get_current(Gblob),
+    LastSeqNum = Sblob#sblob.seqnum,
+    NewSeqNum0 = LastSeqNum + SeqNum,
+    NewSeqNum = if NewSeqNum0 < 0 -> 0;
+                   true -> NewSeqNum0
+                end,
+    get(Gblob1, NewSeqNum, Count);
 get(Gblob, SeqNum, Count) ->
+    ?debugFmt("get seqnum ~p ~p", [SeqNum, Count]),
     {Gblob1, Sblob} = gblob_util:get_current(Gblob),
     BaseSeqNum = Sblob#sblob.base_seqnum,
     CurrentSblobSize = Sblob#sblob.size,

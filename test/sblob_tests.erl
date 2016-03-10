@@ -15,6 +15,7 @@ usage_test_() ->
       fun open_write_close_open_has_correct_size/1,
       fun write_one/1,
       fun write_one_read_one/1,
+      fun write_one_read_0/1,
 
       fun no_write_stats/1,
       fun write_stats/1,
@@ -300,6 +301,12 @@ write_one_read_one(Sblob) ->
      ?_assertEqual(RSn, NewSeqNum),
      ?_assertEqual(RLen, size(Data)),
      ?_assertEqual(RData, WData)].
+
+write_one_read_0(Sblob) ->
+    Data = <<"hello sblob!">>,
+    {#sblob{}=Sblob1, #sblob_entry{}} = sblob:put(Sblob, Data),
+    {_NewSblob, Result} = sblob:get(Sblob1, nil, 0),
+    [?_assertEqual(Result, [])].
 
 write_one_read_last(Sblob) ->
     Data = <<"hello sblob!">>,
