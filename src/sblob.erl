@@ -1,4 +1,5 @@
 -module(sblob).
+-include_lib("kernel/include/logger.hrl").
 
 -export([open/3, close/1, delete/1, put/2, put/3, get/2, get/3, stats/1]).
 
@@ -21,10 +22,10 @@ open(Path, Name, Opts) ->
 
     case sblob_util:fill_bounds(Sblob) of
         {ok, Result} ->
-            lager:debug("open ~p", [lager:pr(Result, ?MODULE)]),
+            ?LOG_DEBUG("open ~p", [Result]),
             Result;
         {error, Reason} ->
-            lager:warning("error filling sblob bounds ~p, trying to recover",
+            ?LOG_WARNING("error filling sblob bounds ~p, trying to recover",
                           [Reason]),
 
             NowStr = integer_to_list(sblob_util:now()),
@@ -38,19 +39,19 @@ open(Path, Name, Opts) ->
     end.
 
 close(#sblob{handle=nil}=Sblob) ->
-    lager:debug("close, no handle ~p", [lager:pr(Sblob, ?MODULE)]),
+    ?LOG_DEBUG("close, no handle ~p", [Sblob]),
     Sblob;
 close(#sblob{handle=Handle}=Sblob) ->
-    lager:debug("close ~p", [lager:pr(Sblob, ?MODULE)]),
+    ?LOG_DEBUG("close ~p", [Sblob]),
     case sblob_util:close_file(Handle) of
         ok -> ok;
         {error, einval} ->
-            lager:warning("closing invalid file handle? ~p ~p", [Handle, lager:pr(Sblob, ?MODULE)])
+            ?LOG_WARNING("closing invalid file handle? ~p ~p", [Handle, Sblob])
     end,
     Sblob#sblob{handle=nil}.
 
 delete(#sblob{fullpath=FullPath}=Sblob) ->
-    lager:debug("delete ~p", [lager:pr(Sblob, ?MODULE)]),
+    ?LOG_DEBUG("delete ~p", [Sblob]),
     NewSblob = close(Sblob),
     % XXX: log remove result? (not for enoent)
     sblob_util:remove(FullPath),
@@ -63,7 +64,7 @@ put(Sblob, Data) ->
 put(#sblob{seqnum=SeqNum, index=Index, size=Size, name=Name}=Sblob, Timestamp, Data) ->
     {Handle, Sblob1} = sblob_util:get_handle(Sblob),
     NewSeqNum = SeqNum + 1,
-    lager:debug("put ~s ~p ~p", [Name, NewSeqNum, Timestamp]),
+    ?LOG_DEBUG("put ~s ~p ~p", [Name, NewSeqNum, Timestamp]),
     {ok, Blob} = sblob_util:file_append(Handle, Timestamp, NewSeqNum, Data),
 
     EntryOffset = Size,
@@ -86,7 +87,7 @@ get(Sblob=#sblob{base_seqnum=BaseSeqNum}, SeqNum, Count) when SeqNum =< BaseSeqN
 get(Sblob=#sblob{seqnum=LastSeqNum}, SeqNum, _Count) when SeqNum > LastSeqNum ->
     {Sblob, []};
 get(Sblob=#sblob{fullpath=FullPath}, SeqNum, Count) ->
-    lager:debug("get ~s ~p ~p", [FullPath, SeqNum, Count]),
+    ?LOG_DEBUG("get ~s ~p ~p", [FullPath, SeqNum, Count]),
     {OffsetSeqNum, Sblob1} = sblob_util:seek_to_seqnum(Sblob, SeqNum),
     {Sblob2, LastSeqNum, _Entries} = sblob_util:read_until(Sblob1, OffsetSeqNum, SeqNum, false),
     {Sblob3, _, Entries} = sblob_util:read_until(Sblob2, LastSeqNum, SeqNum + Count, true),

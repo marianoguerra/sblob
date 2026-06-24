@@ -1,4 +1,5 @@
 -module(gblob_server).
+-include_lib("kernel/include/logger.hrl").
 -behaviour(gen_server).
 
 -export([start_link/2, start_link/3, stop/1, put/2, put/3, put/4, close/1,
@@ -120,7 +121,7 @@ handle_call({get, SeqNum, Count}, _From, State=#state{gblob=Gblob}) ->
 
 handle_call({truncate_percentage, Percentage}, _From, State=#state{gblob=Gblob}) ->
     {NewGblob, Result} = gblob:truncate_percentage(Gblob, Percentage),
-    lager:info("truncate percentage ~s ~p", [NewGblob#gblob.path, Percentage]),
+    ?LOG_INFO("truncate percentage ~s ~p", [NewGblob#gblob.path, Percentage]),
     NewState = update_gblob(State, NewGblob),
     {reply, Result, NewState, State#state.check_interval_ms};
 
@@ -217,7 +218,7 @@ do_check(State=#state{gblob=Gblob, last_action=LastAction, check_interval_ms=Che
     ShouldClose = LastAction < LastCheckTime,
 
     {NewActive, NewGblob} = if ShouldClose ->
-                                   lager:debug("closing inactive gblob ~s", [Path]),
+                                   ?LOG_DEBUG("closing inactive gblob ~s", [Path]),
                                    {false, gblob:close(Gblob)};
                                true ->
                                    {true, Gblob}

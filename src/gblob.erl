@@ -1,4 +1,5 @@
 -module(gblob).
+-include_lib("kernel/include/logger.hrl").
 
 -export([open/2, close/1, delete/1, put/2, put/3, put/4, get/2, get/3,
          check_eviction/1, truncate/2, truncate_percentage/2, size/1]).
@@ -65,7 +66,7 @@ rotate(#gblob{current=Sblob, max_chunk_num=ChunkNum, index=Index}=Gblob) ->
     NewChunkNum = ChunkNum + 1,
     #sblob{seqnum=LastSeqNum, fullpath=SblobPath} = Sblob1,
     NewPath = gblob_util:path_for_chunk_num(Gblob, NewChunkNum),
-    lager:debug("rotating ~p to ~p", [SblobPath, NewPath]),
+    ?LOG_DEBUG("rotating ~p to ~p", [SblobPath, NewPath]),
     ok = file:rename(SblobPath, NewPath),
     NewIndex = sblob_idx:expand(Index, 1),
     Gblob1 = Gblob#gblob{max_chunk_num=NewChunkNum, current=nil, index=NewIndex},

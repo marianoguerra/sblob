@@ -1,4 +1,5 @@
 -module(sblob_util).
+-include_lib("kernel/include/logger.hrl").
 -export([parse_config/1, now/0, now_fast/0,
          get_handle/1, seek_to_seqnum/2,
          clear_data/1, read/2, remove/1, mark_removed/1,
@@ -70,7 +71,7 @@ file_append(Handle, Timestamp, NewSeqNum, Data) ->
 % and store it in the returned Sblob record
 get_handle(#sblob{fullpath=FullPath, handle=nil,
                   config=#sblob_cfg{read_ahead=ReadAhead}}=Sblob) ->
-    lager:debug("get handle ~s", [FullPath]),
+    ?LOG_DEBUG("get handle ~s", [FullPath]),
     Handle = open_file(FullPath, ReadAhead),
     {ok, Size} = file_handle_cache:position(Handle, eof),
     {Handle, Sblob#sblob{handle=Handle, position=Size, size=Size}};
@@ -84,11 +85,11 @@ seek(#sblob{handle=nil}=Sblob, Location) ->
     {_, Sblob1} = get_handle(Sblob),
     seek(Sblob1, Location);
 seek(#sblob{handle=Handle, name=Name}=Sblob, Location) ->
-    lager:debug("seek ~s ~p", [Name, Location]),
+    ?LOG_DEBUG("seek ~s ~p", [Name, Location]),
     case file_handle_cache:position(Handle, Location) of
         {ok, NewPos} -> {ok, Sblob#sblob{position=NewPos}};
         Error ->
-            lager:error("error seeking sblob ~p to ~p: ~p",
+            ?LOG_ERROR("error seeking sblob ~p to ~p: ~p",
                         [Name, Location, Error]),
             {error, Error, sblob:close(Sblob)}
     end.
@@ -108,7 +109,7 @@ fill_bounds_end(#sblob{name=Name}=Sblob1, FirstSeqNum, FirstOffset,
         {ok, {Sblob2, #sblob_entry{seqnum=LastSeqNum,
                                    offset=LastOffset}}} ->
             BaseSeqNum = FirstSeqNum  - 1,
-            lager:debug("fill bounds ~s ~p - ~p",
+            ?LOG_DEBUG("fill bounds ~s ~p - ~p",
                         [Name, BaseSeqNum, LastSeqNum]),
             Index = sblob_idx:new(BaseSeqNum + 1, MaxItems),
             try
@@ -133,7 +134,7 @@ fill_bounds(#sblob{name=Name}=Sblob) ->
 
             case First of
                 notfound ->
-                    lager:debug("fill bounds, empty ~s", [Name]),
+                    ?LOG_DEBUG("fill bounds, empty ~s", [Name]),
                     Index = sblob_idx:new(CfgBaseSeqNum + 1, MaxItems),
                     {ok, Sblob1#sblob{base_seqnum=CfgBaseSeqNum, seqnum=CfgBaseSeqNum,
                                       size=0, index=Index}};
@@ -217,7 +218,7 @@ mark_removed(Path) ->
 
 offset_for_seqnum(#sblob{index=Idx}, SeqNum) -> 
     Result = sblob_idx:closest(Idx, SeqNum),
-    lager:debug("offset for seqnum ~p: ~p", [SeqNum, Result]),
+    ?LOG_DEBUG("offset for seqnum ~p: ~p", [SeqNum, Result]),
     Result.
 
 raw_get_next(Handle) ->
@@ -307,11 +308,11 @@ seek_and_get_next(Sblob, Position) ->
     end.
 
 get_first(#sblob{fullpath=FullPath}=Sblob) ->
-    lager:debug("get_first ~s", [FullPath]),
+    ?LOG_DEBUG("get_first ~s", [FullPath]),
     seek_and_get_next(Sblob, bof).
 
 get_last(#sblob{fullpath=FullPath}=Sblob) ->
-    lager:debug("get_last ~s", [FullPath]),
+    ?LOG_DEBUG("get_last ~s", [FullPath]),
     LenSize = ?SBLOB_HEADER_LEN_SIZE_BYTES,
 
     case seek(Sblob, {eof, -LenSize}) of
@@ -334,7 +335,7 @@ get_last(#sblob{fullpath=FullPath}=Sblob) ->
 
 
 read_until(#sblob{name=Name}=Sblob, CurSeqNum, TargetSeqNum, Accumulate) ->
-    lager:debug("read_until ~s ~p ~p", [Name, CurSeqNum, TargetSeqNum]),
+    ?LOG_DEBUG("read_until ~s ~p ~p", [Name, CurSeqNum, TargetSeqNum]),
     read_until(Sblob, CurSeqNum, TargetSeqNum, Accumulate, []).
 
 
@@ -357,7 +358,7 @@ read_until(Sblob=#sblob{fullpath=FullPath}, CurSeqNum, TargetSeqNum, Accumulate,
             read_until(Sblob1, Blob#sblob_entry.seqnum + 1, TargetSeqNum,
                        Accumulate, NewAccum);
         {error, Reason} ->
-            lager:warning("error in read_until ~p: ~p", [FullPath, Reason]),
+            ?LOG_WARNING("error in read_until ~p: ~p", [FullPath, Reason]),
             % XXX get_next should close the handle but doesn't return the sblob
             % so we set it to nil here:
             % TODO: we should signal there was an error here
@@ -392,7 +393,7 @@ seqread_fold_fun(#sblob_entry{seqnum=EntrySeqNum}=Entry, {Items, FirstSeqNum, _,
     {continue, {[Entry|Items], FirstSeqNum, EntrySeqNum, Count + 1, MaxCount, MinSeqNum}}.
 
 seqread(Path, ChunkName, SeqNum, Count, _Opts) ->
-    lager:debug("seqread ~s ~p ~p", [ChunkName, SeqNum, Count]),
+    ?LOG_DEBUG("seqread ~s ~p ~p", [ChunkName, SeqNum, Count]),
     SblobPath = filename:join([Path, ChunkName]),
     case open_read_file(SblobPath) of
         {ok, Handle} ->
@@ -482,7 +483,7 @@ get_blob_info(BasePath, Name, Index) ->
     end.
 
 recover_move(#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
-    lager:info("recover: move faulty block ~p: ~p", [Name, Path]),
+    ?LOG_INFO("recover: move faulty block ~p: ~p", [Name, Path]),
     BrokenName = "broken." ++ Name ++ "." ++ Uid,
     BrokenPath = filename:join(Path, BrokenName),
     case file:rename(FullPath, BrokenPath) of
@@ -522,7 +523,7 @@ recover_fold_fun(Sblob=#sblob_entry{timestamp=Ts, seqnum=SeqNum, offset=Offset},
 log_recover_state(#recover_st{last_seqnum=LastSeqNum, entry_count=Count,
                               read_bytes=ReadBytes, total_bytes=TotalBytes},
                  StopReason) ->
-    lager:info("recovered ~p entries, last seqnum ~p, ~p bytes from ~p, end by ~p",
+    ?LOG_INFO("recovered ~p entries, last seqnum ~p, ~p bytes from ~p, end by ~p",
                [Count, LastSeqNum, ReadBytes, TotalBytes, StopReason]).
 
 do_recover(Path, Name, FoldOpts, RecoverState) ->
@@ -556,12 +557,12 @@ recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
         case file:rename(RecoverPath, FullPath) of
             ok -> ok;
             Error ->
-                lager:warning("Error moving recovered file: ~p", [Error]),
+                ?LOG_WARNING("Error moving recovered file: ~p", [Error]),
                 ok
         end
     catch
         EType:EReason:Stacktrace ->
-            lager:warning("Error recovering file ~p: ~p ~p, truncating~n~p",
+            ?LOG_WARNING("Error recovering file ~p: ~p ~p, truncating~n~p",
                           [FullPath, EType, EReason, Stacktrace])
     after
         close_file(Handle),

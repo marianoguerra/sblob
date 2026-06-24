@@ -1,4 +1,5 @@
 -module(gblob_util).
+-include_lib("kernel/include/logger.hrl").
 -export([parse_config/1,
          get_current/1, get_current/2,
          should_rotate/1,
@@ -173,13 +174,13 @@ get_eviction_plan_for_size_limit(BasePath, MaxSizeBytes) ->
     partition_by_size(Stats, MaxSizeBytes).
 
 evict(Path) ->
-    lager:debug("Removing path ~p", [Path]),
+    ?LOG_DEBUG("Removing path ~p", [Path]),
     sblob_util:remove(Path).
 
 % returns {RemovedSize, RemovedCount, Errors}
 run_eviction_plan({_, ToKeep, ToRemove}) ->
     if length(ToRemove) > 0 ->
-           lager:debug("run eviction plan keep ~p, remove ~p", [ToKeep, ToRemove]);
+           ?LOG_DEBUG("run eviction plan keep ~p, remove ~p", [ToKeep, ToRemove]);
        true -> ok
     end,
     lists:foldl(fun (#sblob_info{path=Path, size=Size}, {CurSize, Count, Errors}) ->
@@ -194,14 +195,14 @@ run_eviction_plan({_, ToKeep, ToRemove}) ->
                 end, {0, 0, []}, ToRemove).
 
 log_eviction_error(Error) ->
-    lager:error("eviction error ~p", [Error]).
+    ?LOG_ERROR("eviction error ~p", [Error]).
 
 log_eviction_results(Path, {RemovedSize, RemovedCount, Errors}) ->
     Msg = "run eviction on ~s, removed ~p blobs (~p bytes) with ~p errors",
     Args = [Path, RemovedCount, RemovedSize, length(Errors)],
 
-    if RemovedSize > 0 -> lager:debug(Msg, Args);
-       true -> lager:debug(Msg, Args)
+    if RemovedSize > 0 -> ?LOG_DEBUG(Msg, Args);
+       true -> ?LOG_DEBUG(Msg, Args)
     end,
 
     lists:foreach(fun log_eviction_error/1, Errors),
@@ -249,7 +250,7 @@ do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
                 % a sblob missing is not an error, it might be evicted
                 {ok, Gblob1, [], SeqNum, 0};
             {error, Reason}=E1 ->
-                lager:error("error in chunk seqread ~p ~p ~p: ~p",
+                ?LOG_ERROR("error in chunk seqread ~p ~p ~p: ~p",
                             [Path, ChunkName, ChunkNum, Reason]),
                 {E1, Gblob1, [], SeqNum, 0}
         end,
@@ -259,7 +260,7 @@ do_seqread(Gblob, Path, ChunkNum, ChunkName, SeqNum, Count, ReadAhead, Accum) ->
                    ok -> Gblob2;
                    {error, RReason} ->
                        Gblob3 = gblob:close(Gblob2),
-                       lager:warning("error in sblob:seqread, attempting recover ~p/~p.~p: ~p", 
+                       ?LOG_WARNING("error in sblob:seqread, attempting recover ~p/~p.~p: ~p", 
                                      [Path, ChunkName, ChunkNum, RReason]),
                        sblob_util:recover_from_path(Path, ChunkName),
                        Gblob3

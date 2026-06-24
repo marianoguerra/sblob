@@ -1,4 +1,5 @@
 -module(sblob_idx).
+-include_lib("kernel/include/logger.hrl").
 -export([new/1, new/2, put/3, closest/2, closest_value/2, expand/2]).
 
 -record(sblob_idx, {base_key=0, data}).
@@ -15,7 +16,7 @@ put(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key, Val) ->
     I = Key - BaseKey,
     NewData = try array:set(I, Val, Data)
               catch error:badarg ->
-                        lager:error("Error adding entry to index, base key ~p, i ~p, key ~p, val ~p",
+                        ?LOG_ERROR("Error adding entry to index, base key ~p, i ~p, key ~p, val ~p",
                                     [BaseKey, I, Key, Val]),
                         error(badarg)
               end,
@@ -40,7 +41,7 @@ closest(#sblob_idx{data=Data, base_key=BaseKey}=Idx, Key) ->
     I = Key - BaseKey,
     Val = try array:get(I, Data)
           catch error:badarg ->
-                    lager:error("Error getting entry from index, base key ~p, i ~p, key ~p",
+                    ?LOG_ERROR("Error getting entry from index, base key ~p, i ~p, key ~p",
                                 [BaseKey, I, Key]),
                     error(badarg)
           end,

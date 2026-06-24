@@ -5,7 +5,6 @@
 usage_test_() ->
     ?debugMsg("starting sblob usage tests"),
     file_handle_cache:start_link(),
-    lager:start(),
     %lager:set_loglevel(lager_console_backend, debug),
     {foreach,
      fun usage_start/0,
