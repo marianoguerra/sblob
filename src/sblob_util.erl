@@ -560,9 +560,9 @@ recover(Sblob=#sblob{fullpath=FullPath, path=Path, name=Name}, Uid) ->
                 ok
         end
     catch
-        EType:EReason ->
+        EType:EReason:Stacktrace ->
             lager:warning("Error recovering file ~p: ~p ~p, truncating~n~p",
-                          [FullPath, EType, EReason, erlang:get_stacktrace()])
+                          [FullPath, EType, EReason, Stacktrace])
     after
         close_file(Handle),
         recover_move(Sblob, Uid)
